@@ -48,13 +48,13 @@ SERVICE
 cat > /etc/nginx/sites-available/cosmic-nexus << 'NGINX'
 server {
     listen 80;
-    server_name cosmical.me;
+    server_name csmcl.space;
     return 301 https://$server_name$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name cosmical.me;
+    server_name csmcl.space;
 
     ssl_certificate /etc/letsencrypt/live/csmcl.space/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/csmcl.space/privkey.pem;
