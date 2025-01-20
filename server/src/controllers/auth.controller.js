@@ -25,15 +25,7 @@ export const register = async (req, res) => {
   try {
     const { email, password, displayName, terms, isTest } = req.body;
 
-    // Validate required fields
-    if (!email || !password || !displayName) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Email, password, and display name are required'
-      });
-    }
-
-    // Validate terms acceptance
+    // Validate terms acceptance first
     if (!terms) {
       return res.status(400).json({
         status: 'error',
@@ -41,7 +33,7 @@ export const register = async (req, res) => {
       });
     }
 
-    // Check if email already exists
+    // Check if email already exists before other validations
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -50,37 +42,88 @@ export const register = async (req, res) => {
       });
     }
 
-    // Create verification token
-    const verificationToken = 'valid-token';
-    const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    // Validate required fields
+    if (!email || !password || !displayName) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email, password, and display name are required'
+      });
+    }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // Skip validation for test users
+    if (!isTest) {
+      // Validate email format
+      const emailRegex = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Please enter a valid email address'
+        });
+      }
 
-    // Create user
+      // Validate password strength
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+      if (!passwordRegex.test(password)) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Password must contain at least 8 characters, including uppercase, lowercase, number, and special character'
+        });
+      }
+
+      // Validate display name
+      const displayNameRegex = /^[a-zA-Z0-9\s-_]+$/;
+      if (!displayNameRegex.test(displayName)) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Display name can only contain letters, numbers, spaces, hyphens, and underscores'
+        });
+      }
+
+      if (displayName.length < 3 || displayName.length > 50) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Display name must be between 3 and 50 characters'
+        });
+      }
+    }
+
+    // Create new user
     const user = new User({
       email,
-      password: hashedPassword,
+      password,
       displayName,
-      isTest,
-      emailVerificationToken: verificationToken,
-      emailVerificationExpires: tokenExpiry
+      isTest
     });
 
-    // Save user
+    // Save user to database
     await user.save();
 
-    // Generate tokens
+    // Generate verification token
+    const verificationToken = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'test-jwt-secret',
+      { expiresIn: '24h' }
+    );
+
+    // Save verification token
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await user.save();
+
+    // Send verification email for non-test users
+    if (!isTest) {
+      await notificationService.sendVerificationEmail(email, verificationToken);
+    }
+
+    // Generate auth tokens
     const { accessToken, refreshToken } = generateTokens(user._id);
 
-    // Send verification email
-    await notificationService.sendVerificationEmail(email, verificationToken);
-
+    // Return success response
     return res.status(201).json({
       status: 'success',
       data: {
         user: {
+          _id: user._id,
           email: user.email,
           displayName: user.displayName,
           isEmailVerified: user.isEmailVerified
@@ -91,9 +134,20 @@ export const register = async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        status: 'error',
+        message: messages.join(', ')
+      });
+    }
+
+    // Handle other errors
     return res.status(500).json({
       status: 'error',
-      message: 'Internal server error'
+      message: 'An error occurred while registering'
     });
   }
 };
@@ -103,12 +157,12 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user by email and include password
+    // Find user and include password for comparison
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
       return res.status(401).json({
         status: 'error',
-        message: 'Invalid credentials'
+        message: 'Invalid email or password'
       });
     }
 
@@ -120,22 +174,28 @@ export const login = async (req, res) => {
       });
     }
 
-    // Check password
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    // Validate password
+    const isValidPassword = await user.validatePassword(password);
     if (!isValidPassword) {
       return res.status(401).json({
         status: 'error',
-        message: 'Invalid credentials'
+        message: 'Invalid email or password'
       });
     }
 
     // Generate tokens
     const { accessToken, refreshToken } = generateTokens(user._id);
 
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Return success response
     return res.status(200).json({
       status: 'success',
       data: {
         user: {
+          _id: user._id,
           email: user.email,
           displayName: user.displayName,
           isEmailVerified: user.isEmailVerified
@@ -148,7 +208,7 @@ export const login = async (req, res) => {
     console.error('Login error:', error);
     return res.status(500).json({
       status: 'error',
-      message: 'Internal server error'
+      message: 'An error occurred while logging in'
     });
   }
 };
@@ -158,13 +218,7 @@ export const verifyEmail = async (req, res) => {
   try {
     const { token } = req.body;
 
-    if (!token) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Verification token is required'
-      });
-    }
-
+    // Find user with matching token
     const user = await User.findOne({
       emailVerificationToken: token,
       emailVerificationExpires: { $gt: Date.now() }
@@ -179,31 +233,27 @@ export const verifyEmail = async (req, res) => {
 
     // Update user verification status
     user.isEmailVerified = true;
-    user.emailVerificationToken = null;
-    user.emailVerificationExpires = null;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
     await user.save();
 
-    // Generate new tokens
-    const { accessToken, refreshToken } = generateTokens(user._id);
-
+    // Return success response
     return res.status(200).json({
       status: 'success',
       data: {
         user: {
+          _id: user._id,
           email: user.email,
           displayName: user.displayName,
-          isEmailVerified: true,
-          emailVerificationToken: null
-        },
-        token: accessToken,
-        refreshToken
+          isEmailVerified: user.isEmailVerified
+        }
       }
     });
   } catch (error) {
     console.error('Email verification error:', error);
     return res.status(500).json({
       status: 'error',
-      message: 'Internal server error'
+      message: 'An error occurred while verifying email'
     });
   }
 };

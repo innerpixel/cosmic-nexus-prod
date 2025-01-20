@@ -18,9 +18,16 @@
             <label for="displayName" class="block text-sm font-medium mb-1 text-gray-700">
               Display Name
             </label>
-            <Field id="displayName" name="displayName" type="text" rules="required|min:3"
+            <Field id="displayName" name="displayName" type="text" 
+              :rules="{ 
+                required: true,
+                min: 3,
+                max: 50,
+                regex: /^[a-zA-Z0-9\s-_]+$/
+              }"
               class="w-full px-4 py-2 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              placeholder="Your display name" autocomplete="name" />
+              placeholder="Your display name" 
+              autocomplete="name" />
             <ErrorMessage name="displayName" class="mt-1 text-sm text-red-500" />
           </div>
 
@@ -29,9 +36,15 @@
             <label for="email" class="block text-sm font-medium mb-1 text-gray-700">
               Email
             </label>
-            <Field id="email" name="email" type="email" rules="required|email"
+            <Field id="email" name="email" type="email" 
+              :rules="{ 
+                required: true,
+                email: true,
+                regex: /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/
+              }"
               class="w-full px-4 py-2 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              placeholder="your-email@cosmical.me" autocomplete="email" />
+              placeholder="your-email@example.com" 
+              autocomplete="email" />
             <ErrorMessage name="email" class="mt-1 text-sm text-red-500" />
           </div>
 
@@ -40,9 +53,18 @@
             <label for="password" class="block text-sm font-medium mb-1 text-gray-700">
               Password
             </label>
-            <Field id="password" name="password" type="password" rules="required|min:8"
+            <Field id="password" name="password" type="password" 
+              :rules="{ 
+                required: true,
+                min: 8,
+                regex: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
+              }"
               class="w-full px-4 py-2 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              placeholder="Create a password" autocomplete="new-password" />
+              placeholder="Create a password" 
+              autocomplete="new-password" />
+            <div class="mt-1 text-xs text-gray-500">
+              Password must contain at least 8 characters, including uppercase, lowercase, number, and special character
+            </div>
             <ErrorMessage name="password" class="mt-1 text-sm text-red-500" />
           </div>
 
