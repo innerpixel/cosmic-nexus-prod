@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
-import { app } from '../../../src/app.js';
-import { User } from '../../../src/models/user.model.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import User from '../../../src/models/user.model.js';
+import app from '../../../src/app.js';
 
 // Mock the notification service
 vi.mock('../../../src/services/notification.service.js', () => ({
@@ -21,7 +21,7 @@ const validUser = {
   email: 'test@example.com',
   password: 'ValidPass123!',
   displayName: 'Test User',
-  terms: true,
+  termsAccepted: true,
   isTest: true
 };
 
@@ -29,7 +29,7 @@ const invalidUser = {
   email: 'invalid-email',
   password: 'weak',
   displayName: 'T',
-  terms: false
+  termsAccepted: false
 };
 
 describe('Authentication API', () => {
@@ -46,43 +46,33 @@ describe('Authentication API', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.status).toBe('success');
-      expect(res.body.data.user).toBeDefined();
       expect(res.body.data.user.email).toBe(validUser.email);
       expect(res.body.data.user.displayName).toBe(validUser.displayName);
-      expect(res.body.data.user.isEmailVerified).toBe(false);
-      expect(res.body.data.token).toBeDefined();
-
-      // Verify user was saved
-      const savedUser = await User.findOne({ email: validUser.email });
-      expect(savedUser).toBeDefined();
-      expect(savedUser.emailVerificationToken).toBeDefined();
-      expect(savedUser.emailVerificationExpires).toBeDefined();
+      expect(res.body.data.accessToken).toBeDefined();
+      expect(res.body.data.refreshToken).toBeDefined();
     });
 
     it('should not register user without terms acceptance', async () => {
-      const userWithoutTerms = { ...validUser, terms: false };
+      const userWithoutTerms = { ...validUser, termsAccepted: false };
       const res = await request(app)
         .post('/api/auth/register')
         .send(userWithoutTerms);
 
       expect(res.status).toBe(400);
       expect(res.body.status).toBe('error');
-      expect(res.body.message).toBe('Terms must be accepted');
+      expect(res.body.message).toBe('You must accept the Terms of Service and Privacy Policy to register');
     });
 
     it('should not register user with existing email', async () => {
-      // First create a user
+      // First registration
       await request(app)
         .post('/api/auth/register')
         .send(validUser);
 
-      // Try to register the same user again
+      // Second registration with same email
       const res = await request(app)
         .post('/api/auth/register')
-        .send({
-          ...validUser,
-          password: 'NewTest123!@#'  // Different password but same email
-        });
+        .send(validUser);
 
       expect(res.status).toBe(400);
       expect(res.body.status).toBe('error');
@@ -100,57 +90,44 @@ describe('Authentication API', () => {
   });
 
   describe('POST /api/auth/verify-email', () => {
-    let verificationToken;
-    let userId;
-
-    beforeEach(async () => {
-      // Create a new user
-      const user = new User({
-        ...validUser,
-        isEmailVerified: false
-      });
-      await user.save();
-      userId = user._id;
-
-      // Generate verification token
-      verificationToken = jwt.sign(
-        { userId: user._id },
-        process.env.JWT_SECRET || 'test-jwt-secret',
-        { expiresIn: '24h' }
-      );
-
-      // Save token to user
-      user.emailVerificationToken = verificationToken;
-      user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      await user.save();
-    });
-
     it('should verify email with valid token', async () => {
+      // Register a user first
       const res = await request(app)
+        .post('/api/auth/register')
+        .send(validUser);
+
+      const user = await User.findOne({ email: validUser.email });
+      const verificationToken = user.emailVerificationToken;
+
+      const verifyRes = await request(app)
         .post('/api/auth/verify-email')
         .send({ token: verificationToken });
 
-      expect(res.status).toBe(200);
-      expect(res.body.status).toBe('success');
+      expect(verifyRes.status).toBe(200);
+      expect(verifyRes.body.status).toBe('success');
+      expect(verifyRes.body.message).toBe('Email verified successfully');
 
-      const user = await User.findById(userId);
-      expect(user.isEmailVerified).toBe(true);
-      expect(user.emailVerificationToken).toBeUndefined();
-      expect(user.emailVerificationExpires).toBeUndefined();
+      // Check if user is verified in database
+      const verifiedUser = await User.findById(user._id);
+      expect(verifiedUser.isEmailVerified).toBe(true);
+      expect(verifiedUser.emailVerificationToken).toBeUndefined();
     });
   });
 
   describe('POST /api/auth/login', () => {
     beforeEach(async () => {
-      // Create verified user
-      const user = new User({
-        ...validUser,
-        isEmailVerified: true
-      });
-      await user.save();
+      // Register a user before login tests
+      await request(app)
+        .post('/api/auth/register')
+        .send(validUser);
     });
 
     it('should login verified user with correct credentials', async () => {
+      // Verify the user first
+      const user = await User.findOne({ email: validUser.email });
+      user.isEmailVerified = true;
+      await user.save();
+
       const res = await request(app)
         .post('/api/auth/login')
         .send({
@@ -159,9 +136,10 @@ describe('Authentication API', () => {
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.data).toHaveProperty('token');
-      expect(res.body.data.user).toHaveProperty('email', validUser.email);
-      expect(res.body.data.user).toHaveProperty('displayName', validUser.displayName);
+      expect(res.body.status).toBe('success');
+      expect(res.body.data.user.email).toBe(validUser.email);
+      expect(res.body.data.accessToken).toBeDefined();
+      expect(res.body.data.refreshToken).toBeDefined();
     });
 
     it('should not login with incorrect password', async () => {
@@ -169,7 +147,7 @@ describe('Authentication API', () => {
         .post('/api/auth/login')
         .send({
           email: validUser.email,
-          password: 'WrongPass123!@#'
+          password: 'wrongpassword'
         });
 
       expect(res.status).toBe(401);

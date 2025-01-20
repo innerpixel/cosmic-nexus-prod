@@ -23,10 +23,10 @@ const generateTokens = (userId) => {
 // Register new user
 export const register = async (req, res) => {
   try {
-    const { email, password, displayName, terms, isTest } = req.body;
+    const { email, password, displayName, termsAccepted, isTest } = req.body;
 
     // Validate terms acceptance first
-    if (!terms) {
+    if (!termsAccepted) {
       return res.status(400).json({
         status: 'error',
         message: 'You must accept the Terms of Service and Privacy Policy to register'
@@ -92,7 +92,7 @@ export const register = async (req, res) => {
       email,
       password,
       displayName,
-      termsAccepted: terms,
+      termsAccepted,
       isTest: isTest || false
     });
 
@@ -129,7 +129,7 @@ export const register = async (req, res) => {
           displayName: user.displayName,
           isEmailVerified: user.isEmailVerified
         },
-        token: accessToken,
+        accessToken,
         refreshToken
       }
     });
@@ -167,20 +167,20 @@ export const login = async (req, res) => {
       });
     }
 
-    // Check if user is verified
-    if (!user.isEmailVerified) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Please verify your email before logging in'
-      });
-    }
-
-    // Validate password
+    // Validate password first
     const isValidPassword = await user.validatePassword(password);
     if (!isValidPassword) {
       return res.status(401).json({
         status: 'error',
         message: 'Invalid email or password'
+      });
+    }
+
+    // Then check if user is verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Please verify your email before logging in'
       });
     }
 
@@ -201,7 +201,7 @@ export const login = async (req, res) => {
           displayName: user.displayName,
           isEmailVerified: user.isEmailVerified
         },
-        token: accessToken,
+        accessToken,
         refreshToken
       }
     });
@@ -241,6 +241,7 @@ export const verifyEmail = async (req, res) => {
     // Return success response
     return res.status(200).json({
       status: 'success',
+      message: 'Email verified successfully',
       data: {
         user: {
           _id: user._id,

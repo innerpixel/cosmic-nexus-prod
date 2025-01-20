@@ -15,6 +15,7 @@ describe('Authentication Service Tests', () => {
         email: 'test@example.com',
         password: 'ValidPass123!',
         displayName: 'Test User',
+        termsAccepted: true,
         isTest: true
       });
       await user.save();
@@ -38,6 +39,7 @@ describe('Authentication Service Tests', () => {
         email: 'test@example.com',
         password: 'ValidPass123!',
         displayName: 'Test User',
+        termsAccepted: true,
         isTest: true
       });
       await user.save();
@@ -61,6 +63,7 @@ describe('Authentication Service Tests', () => {
         email: 'test@example.com',
         password: 'ValidPass123!',
         displayName: 'Test User',
+        termsAccepted: true,
         isTest: true
       });
       await user.save();
@@ -76,6 +79,7 @@ describe('Authentication Service Tests', () => {
         email: 'test@example.com',
         password: 'ValidPass123!',
         displayName: 'Test User',
+        termsAccepted: true,
         isTest: true
       });
       await user.save();

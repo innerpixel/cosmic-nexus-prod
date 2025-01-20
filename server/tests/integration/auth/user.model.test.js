@@ -13,6 +13,7 @@ describe('User Model Tests', () => {
         email: 'test@example.com',
         password: 'ValidPass123!',
         displayName: 'Test User',
+        termsAccepted: true,
         isTest: true
       });
 
@@ -26,7 +27,8 @@ describe('User Model Tests', () => {
       const userWithInvalidEmail = new User({
         email: 'invalid-email',
         password: 'ValidPass123!',
-        displayName: 'Test User'
+        displayName: 'Test User',
+        termsAccepted: true
       });
 
       await expect(userWithInvalidEmail.save()).rejects.toThrow();
@@ -37,6 +39,7 @@ describe('User Model Tests', () => {
         email: 'test@example.com',
         password: 'weak',
         displayName: 'Test User',
+        termsAccepted: true,
         isTest: false
       });
 
@@ -48,6 +51,7 @@ describe('User Model Tests', () => {
         email: 'test@example.com',
         password: 'simple123',
         displayName: 'Test User',
+        termsAccepted: true,
         isTest: true
       });
 
@@ -59,7 +63,8 @@ describe('User Model Tests', () => {
       const userWithInvalidDisplayName = new User({
         email: 'test@example.com',
         password: 'ValidPass123!',
-        displayName: 'Test User @#$'
+        displayName: 'Test User @#$',
+        termsAccepted: true
       });
 
       await expect(userWithInvalidDisplayName.save()).rejects.toThrow();
@@ -69,7 +74,8 @@ describe('User Model Tests', () => {
       const userWithShortDisplayName = new User({
         email: 'test@example.com',
         password: 'ValidPass123!',
-        displayName: 'Ab'
+        displayName: 'Ab',
+        termsAccepted: true
       });
 
       await expect(userWithShortDisplayName.save()).rejects.toThrow();
@@ -79,7 +85,8 @@ describe('User Model Tests', () => {
       const userWithLongDisplayName = new User({
         email: 'test@example.com',
         password: 'ValidPass123!',
-        displayName: 'A'.repeat(51)
+        displayName: 'A'.repeat(51),
+        termsAccepted: true
       });
 
       await expect(userWithLongDisplayName.save()).rejects.toThrow();
@@ -132,6 +139,7 @@ describe('User Model Tests', () => {
         email: 'test@example.com',
         password,
         displayName: 'Test User',
+        termsAccepted: true,
         isTest: true
       });
 
@@ -146,6 +154,7 @@ describe('User Model Tests', () => {
         email: 'test@example.com',
         password,
         displayName: 'Test User',
+        termsAccepted: true,
         isTest: true
       });
 
@@ -159,6 +168,7 @@ describe('User Model Tests', () => {
         email: 'test@example.com',
         password: 'ValidPass123!',
         displayName: 'Test User',
+        termsAccepted: true,
         isTest: true
       });
 
@@ -174,6 +184,7 @@ describe('User Model Tests', () => {
         email: 'test@example.com',
         password: 'ValidPass123!',
         displayName: 'Test User',
+        termsAccepted: true,
         isTest: true
       });
 
@@ -186,6 +197,7 @@ describe('User Model Tests', () => {
         email: 'test@example.com',
         password: 'ValidPass123!',
         displayName: 'Test User',
+        termsAccepted: true,
         isTest: true
       });
 
