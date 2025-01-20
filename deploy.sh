@@ -22,6 +22,9 @@ ssh -i ~/.ssh/id_ed25519 root@147.93.58.192 "bash -s" << 'EOF'
 cd /var/www/cosmic-nexus/backend
 npm install --production
 
+# Gracefully stop the existing service if running
+systemctl stop cosmic-nexus 2>/dev/null || true
+
 # Create systemd service for the backend
 cat > /etc/systemd/system/cosmic-nexus.service << 'SERVICE'
 [Unit]
@@ -32,9 +35,10 @@ After=network.target mongod.service
 Type=simple
 User=www-data
 WorkingDirectory=/var/www/cosmic-nexus/backend
+Environment=PORT=5000
+Environment=NODE_ENV=production
 ExecStart=/usr/bin/node dist/index.js
 Restart=always
-Environment=NODE_ENV=production
 
 [Install]
 WantedBy=multi-user.target
@@ -76,7 +80,7 @@ server {
 
     # Backend API
     location /api {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:5000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -86,6 +90,12 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
 }
 NGINX
 
@@ -96,11 +106,12 @@ rm -f /etc/nginx/sites-enabled/default
 # Set proper permissions
 chown -R www-data:www-data /var/www/cosmic-nexus
 
-# Start services
+# Reload services
 systemctl daemon-reload
-systemctl enable cosmic-nexus
+
+# Restart services gracefully
 systemctl restart cosmic-nexus
-systemctl restart nginx
+nginx -t && systemctl reload nginx
 
 # Show status
 systemctl status cosmic-nexus

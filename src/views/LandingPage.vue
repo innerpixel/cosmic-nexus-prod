@@ -1,215 +1,144 @@
 <template>
-  <div class="w-full">
-    <!-- Hero Section -->
-    <header class="relative h-screen flex items-center justify-center pt-16">
-      <div class="absolute inset-0 bg-grid-pattern" :class="{'dark-grid': isDark, 'light-grid': !isDark}"></div>
-      <div class="relative z-10 text-center w-full md:px-8 md:max-w-4xl mx-auto">
-        <div class="p-4 md:p-8 rounded-none md:rounded-xl border-0 md:border backdrop-blur-sm transition-colors duration-300"
-          :class="isDark ? 'bg-cyber-light/30 md:border-cyber-primary/10' : 'bg-cosmic-light/30 md:border-cosmic-primary/10'">
-          <CosmicLogo :isDark="isDark" class="w-32 h-32 mx-auto mb-8" />
-          <h1 class="text-5xl md:text-6xl font-bold mb-4 transition-colors duration-300"
-            :class="{'cyber-glitch': isDark, 'cosmic-glitch': !isDark}" data-text="Welcome to the Future">
-            Welcome to the Future
-          </h1>
-          <p class="text-xl mb-8 transition-colors duration-300"
-            :class="isDark ? 'text-gray-300' : 'text-cosmic-text'">
-            Discover the next generation of digital innovation
-          </p>
-          <div class="flex flex-col md:flex-row gap-4 justify-center items-center">
-            <button class="w-full md:w-auto btn-primary transition-colors duration-300"
-              :class="isDark ? 'bg-cyber-primary hover:bg-cyber-primary/80' : 'bg-cosmic-primary hover:bg-cosmic-primary/80'">
-              Get Started
-            </button>
-            <button class="w-full md:w-auto btn-secondary transition-colors duration-300"
-              :class="isDark ? 'border-cyber-primary hover:bg-cyber-primary/20' : 'border-cosmic-primary hover:bg-cosmic-primary/20'">
-              Learn More
-            </button>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <!-- Features Section -->
-    <section id="features" class="py-24 px-4 md:px-8 transition-colors duration-300"
-      :class="isDark ? 'bg-cyber-light' : 'bg-cosmic-light'">
-      <h2 class="text-4xl font-bold text-center mb-16 transition-colors duration-300"
-        :class="isDark ? 'text-cyber-primary' : 'text-cosmic-primary'">Core Features</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8 w-full md:max-w-7xl mx-auto">
-        <div v-for="feature in features" :key="feature.title"
-          class="group relative p-4 md:p-8 rounded-none md:rounded-xl border-0 md:border hover:-translate-y-2 transition-all duration-300"
-          :class="isDark ? 'bg-cyber-light/50 md:border-cyber-primary/10' : 'bg-cosmic-light/50 md:border-cosmic-primary/10'">
-          <div class="relative z-10">
-            <div class="w-16 h-16 mb-6 flex items-center justify-center rounded-full transition-colors duration-300"
-              :class="[
-                isDark ? 'bg-cyber-primary/20' : 'bg-cosmic-primary/20',
-                `feature-icon-${feature.iconClass}`
-              ]">
-              <span class="text-3xl">{{ feature.icon }}</span>
+  <div class="min-h-screen bg-gray-900 text-gray-100">
+    <!-- Navigation -->
+    <nav class="bg-gray-900/50 backdrop-blur-sm border-b border-gray-800">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+          <div class="flex">
+            <div class="flex-shrink-0 flex items-center">
+              <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+               CSMCL SPACE
+              </h1>
             </div>
-            <h3 class="text-xl font-bold mb-4 transition-colors duration-300"
-              :class="isDark ? 'text-cyber-primary' : 'text-cosmic-primary'">
-              {{ feature.title }}
-            </h3>
-            <p class="transition-colors duration-300"
-              :class="isDark ? 'text-gray-300' : 'text-cosmic-text'">
-              {{ feature.description }}
-            </p>
+          </div>
+          <div class="flex items-center space-x-4">
+            <router-link :to="{ name: 'login' }"
+              class="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors duration-300">
+              Sign In
+            </router-link>
+            <router-link :to="{ name: 'register' }"
+              class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-300">
+              Join Now
+            </router-link>
           </div>
         </div>
       </div>
-    </section>
+    </nav>
 
-    <!-- About Section -->
-    <section id="about" class="py-24 px-4 md:px-8 transition-colors duration-300"
-      :class="isDark ? 'bg-cyber-dark' : 'bg-cosmic-dark'">
-      <div class="max-w-full md:max-w-7xl mx-auto text-center">
-        <h2 class="text-4xl font-bold mb-8 transition-colors duration-300"
-          :class="isDark ? 'text-cyber-primary' : 'text-cosmic-primary'">About Us</h2>
-        <p class="text-xl max-w-3xl mx-auto mb-16 leading-relaxed transition-colors duration-300"
-          :class="isDark ? 'text-gray-300' : 'text-cosmic-text'">
-          We are pioneers in digital innovation, crafting the future through cutting-edge technology and creative solutions.
-        </p>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
-          <div v-for="stat in stats" :key="stat.label"
-            class="p-4 md:p-8 rounded-none md:rounded-xl border-0 md:border transition-colors duration-300"
-            :class="isDark ? 'bg-cyber-light/50 md:border-cyber-primary/10' : 'bg-cosmic-light/50 md:border-cosmic-primary/10'">
-            <div class="text-4xl font-bold mb-2 transition-colors duration-300"
-              :class="isDark ? 'text-cyber-primary' : 'text-cosmic-primary'">{{ stat.value }}</div>
-            <div class="text-lg transition-colors duration-300"
-              :class="isDark ? 'text-gray-300' : 'text-cosmic-text'">{{ stat.label }}</div>
+    <!-- Hero Section with Particles -->
+    <div class="relative overflow-hidden">
+      <!-- Star field background -->
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-900 via-gray-900 to-gray-950">
+        <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSIjRkZGIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxjaXJjbGUgY3g9IjMiIGN5PSIzIiByPSIxIi8+PC9nPjwvc3ZnPg==')] opacity-30"></div>
+      </div>
+
+      <!-- Content -->
+      <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32">
+        <div class="text-center">
+          <!-- Logo Section -->
+          <div class="flex justify-center mb-6">
+            <router-link :to="{ name: 'home' }" 
+              class="inline-block w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 hover:scale-105 transition-transform duration-300">
+              <CosmicLogo :isDark="true" />
+            </router-link>
+          </div>
+
+          <h2 class="text-4xl sm:text-5xl md:text-6xl font-extrabold">
+            <span class="block text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500">
+              Welcome to the Future
+            </span>
+            <span class="block text-white mt-2">
+              of Digital Space
+            </span>
+          </h2>
+          
+          <p class="mt-6 max-w-2xl mx-auto text-xl text-gray-300">
+            CSMCL-SPACE is more than just a platform - it's a gateway to a new digital frontier.
+            Join us in creating a universe where innovation meets community.
+          </p>
+
+          <div class="mt-10 max-w-sm mx-auto sm:max-w-none sm:flex sm:justify-center sm:space-x-4">
+            <router-link :to="{ name: 'register' }"
+              class="w-full sm:w-auto flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 transition-all duration-300 mb-4 sm:mb-0">
+              Begin Your Journey
+            </router-link>
+            <router-link :to="{ name: 'login' }"
+              class="w-full sm:w-auto flex items-center justify-center px-8 py-3 border border-gray-700 text-base font-medium rounded-md text-gray-300 bg-gray-900 hover:bg-gray-800 transform hover:scale-105 transition-all duration-300">
+              Access Portal
+            </router-link>
+          </div>
+        </div>
+
+        <!-- Feature Cards -->
+        <div class="mt-32 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <!-- Card 1 -->
+          <div class="relative group">
+            <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg blur opacity-25 group-hover:opacity-75 transition duration-1000"></div>
+            <div class="relative p-6 bg-gray-900 ring-1 ring-gray-800 rounded-lg">
+              <div class="flex items-center justify-center h-12 w-12 rounded-md bg-blue-600 text-white mb-4">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
+                </svg>
+              </div>
+              <h3 class="text-lg font-medium text-white mb-2">Digital Innovation</h3>
+              <p class="text-gray-400">Experience the next generation of digital interaction in a space designed for the future.</p>
+            </div>
+          </div>
+
+          <!-- Card 2 -->
+          <div class="relative group">
+            <div class="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg blur opacity-25 group-hover:opacity-75 transition duration-1000"></div>
+            <div class="relative p-6 bg-gray-900 ring-1 ring-gray-800 rounded-lg">
+              <div class="flex items-center justify-center h-12 w-12 rounded-md bg-purple-600 text-white mb-4">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+                </svg>
+              </div>
+              <h3 class="text-lg font-medium text-white mb-2">Community Connection</h3>
+              <p class="text-gray-400">Join a thriving community of innovators, creators, and visionaries.</p>
+            </div>
+          </div>
+
+          <!-- Card 3 -->
+          <div class="relative group">
+            <div class="absolute -inset-0.5 bg-gradient-to-r from-pink-600 to-blue-600 rounded-lg blur opacity-25 group-hover:opacity-75 transition duration-1000"></div>
+            <div class="relative p-6 bg-gray-900 ring-1 ring-gray-800 rounded-lg">
+              <div class="flex items-center justify-center h-12 w-12 rounded-md bg-pink-600 text-white mb-4">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                </svg>
+              </div>
+              <h3 class="text-lg font-medium text-white mb-2">Secure Future</h3>
+              <p class="text-gray-400">Built with cutting-edge security and privacy features to protect your digital presence.</p>
+            </div>
           </div>
         </div>
       </div>
-    </section>
+    </div>
 
-    <!-- Contact Section -->
-    <section id="contact" class="py-24 px-4 md:px-8 transition-colors duration-300"
-      :class="isDark ? 'bg-cyber-light' : 'bg-cosmic-light'">
-      <div class="max-w-4xl mx-auto text-center">
-        <h2 class="text-4xl font-bold mb-8 transition-colors duration-300"
-          :class="isDark ? 'text-cyber-primary' : 'text-cosmic-primary'">Get in Touch</h2>
-        <p class="text-xl mb-12 transition-colors duration-300"
-          :class="isDark ? 'text-gray-300' : 'text-cosmic-text'">
-          Ready to start your journey into the future? Contact us today.
-        </p>
-        <button class="btn-primary transition-colors duration-300"
-          :class="isDark ? 'bg-cyber-primary hover:bg-cyber-primary/80' : 'bg-cosmic-primary hover:bg-cosmic-primary/80'">
-          Contact Us
-        </button>
+    <!-- Footer -->
+    <footer class="bg-gray-900 border-t border-gray-800">
+      <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+        <div class="text-center">
+          <p class="text-gray-400">&copy; 2025 CSMCL-SPACE. Exploring the Digital Frontier.</p>
+        </div>
       </div>
-    </section>
+    </footer>
   </div>
 </template>
-
 <script setup>
-import { ref } from 'vue'
-import CosmicLogo from '../components/CosmicLogo.vue'
-
-const features = ref([
-  {
-    icon: '🚀',
-    iconClass: 'innovation',
-    title: 'Innovation',
-    description: 'Push the boundaries of what is possible',
-  },
-  {
-    icon: '💡',
-    iconClass: 'technology',
-    title: 'Technology',
-    description: 'Cutting-edge solutions for tomorrow'
-  },
-  {
-    icon: '🌍',
-    iconClass: 'impact',
-    title: 'Global Impact',
-    description: 'Changing the world, one step at a time'
-  },
-  {
-    icon: '🔮',
-    iconClass: 'future',
-    title: 'Future Ready',
-    description: 'Prepared for tomorrow challenges'
-  }
-])
-
-const stats = ref([
-  { value: '2025', label: 'Founded' },
-  { value: '100+', label: 'Projects' },
-  { value: '50+', label: 'Team Members' },
-  { value: '24/7', label: 'Support' }
-])
-
-defineProps({
-  isDark: {
-    type: Boolean,
-    required: true
-  }
-})
+  import CosmicLogo from '../components/CosmicLogo.vue';
 </script>
 
-<style>
-.bg-grid-pattern {
-  background-size: 100% 100%, 100% 100%, 30px 30px, 30px 30px;
+
+<style scoped>
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+  100% { transform: translateY(0px); }
 }
 
-.dark-grid {
-  background: 
-    linear-gradient(to bottom, transparent 0%, theme('colors.cyber.dark') 90%),
-    radial-gradient(circle at center, transparent 0%, theme('colors.cyber.dark') 100%),
-    linear-gradient(90deg, theme('colors.cyber.primary') / 10% 1px, transparent 1px),
-    linear-gradient(0deg, theme('colors.cyber.primary') / 10% 1px, transparent 1px);
-}
-
-.light-grid {
-  background: 
-    linear-gradient(to bottom, transparent 0%, theme('colors.cosmic.dark') 90%),
-    radial-gradient(circle at center, transparent 0%, theme('colors.cosmic.dark') 100%),
-    linear-gradient(90deg, theme('colors.cosmic.primary') / 10% 1px, transparent 1px),
-    linear-gradient(0deg, theme('colors.cosmic.primary') / 10% 1px, transparent 1px);
-}
-
-.cyber-glitch {
-  position: relative;
-  text-shadow: 0.05em 0 0 #00fffc, -0.03em -0.04em 0 #fc00ff,
-                0.025em 0.04em 0 #fffc00;
-  animation: glitch 725ms infinite;
-}
-
-.cosmic-glitch {
-  position: relative;
-  text-shadow: 0.05em 0 0 #7e3ff2, -0.03em -0.04em 0 #f23f99,
-                0.025em 0.04em 0 #3ff2a5;
-  animation: glitch 725ms infinite;
-}
-
-@keyframes glitch {
-  0% {
-    text-shadow: 0.05em 0 0 #00fffc, -0.03em -0.04em 0 #fc00ff,
-                 0.025em 0.04em 0 #fffc00;
-  }
-  15% {
-    text-shadow: 0.05em 0 0 #00fffc, -0.03em -0.04em 0 #fc00ff,
-                 0.025em 0.04em 0 #fffc00;
-  }
-  16% {
-    text-shadow: -0.05em -0.025em 0 #00fffc, 0.025em 0.035em 0 #fc00ff,
-                 -0.05em -0.05em 0 #fffc00;
-  }
-  49% {
-    text-shadow: -0.05em -0.025em 0 #00fffc, 0.025em 0.035em 0 #fc00ff,
-                 -0.05em -0.05em 0 #fffc00;
-  }
-  50% {
-    text-shadow: 0.05em 0.035em 0 #00fffc, 0.03em 0 0 #fc00ff,
-                 0 -0.04em 0 #fffc00;
-  }
-  99% {
-    text-shadow: 0.05em 0.035em 0 #00fffc, 0.03em 0 0 #fc00ff,
-                 0 -0.04em 0 #fffc00;
-  }
-  100% {
-    text-shadow: -0.05em 0 0 #00fffc, -0.025em -0.04em 0 #fc00ff,
-                 -0.04em -0.025em 0 #fffc00;
-  }
+.float-animation {
+  animation: float 6s ease-in-out infinite;
 }
 </style>

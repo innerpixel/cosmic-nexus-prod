@@ -1,53 +1,82 @@
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
-import validator from 'validator';
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 const userSchema = new mongoose.Schema({
+  displayName: {
+    type: String,
+    required: true,
+    trim: true,
+    minlength: 1,
+    maxlength: 50
+  },
+  cosmicalName: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    lowercase: true,
+    minlength: 3,
+    maxlength: 30,
+    match: [/^[a-z0-9]+$/, 'Cosmical name can only contain lowercase letters and numbers']
+  },
   email: {
     type: String,
-    required: [true, 'Email is required'],
+    required: true,
     unique: true,
-    lowercase: true,
-    validate: [validator.isEmail, 'Please provide a valid email']
+    trim: true,
+    lowercase: true
+  },
+  backupEmail: {
+    type: String,
+    required: true,
+    trim: true,
+    lowercase: true
+  },
+  phone: {
+    type: String,
+    required: true,
+    trim: true,
+    unique: true
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
-    minlength: 8,
-    select: false
-  },
-  displayName: {
-    type: String,
-    required: [true, 'Display name is required'],
-    validate: {
-      validator: function(v) {
-        // Check if display name has at most 2 words
-        return v.trim().split(/\s+/).length <= 2;
-      },
-      message: 'Display name must be at most 2 words'
-    }
+    required: true,
+    minlength: 8
   },
   isEmailVerified: {
     type: Boolean,
     default: false
   },
-  verificationToken: String,
-  verificationTokenExpires: Date,
+  isPhoneVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationToken: String,
+  emailVerificationExpires: Date,
+  phoneVerificationCode: String,
+  phoneVerificationExpires: Date,
   passwordResetToken: String,
   passwordResetExpires: Date,
-  role: {
-    type: String,
-    enum: ['user', 'admin'],
-    default: 'user'
+  nftMinted: {
+    type: Boolean,
+    default: false
   },
-  profile: {
-    avatar: String,
-    theme: {
-      type: String,
-      enum: ['light', 'dark', 'system'],
-      default: 'system'
-    }
-  }
+  nftTokenId: String,
+  tokensDistributed: {
+    type: Boolean,
+    default: false
+  },
+  tokenBalance: {
+    type: Number,
+    default: 0
+  },
+  lastLogin: Date,
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: Date
 }, {
   timestamps: true
 });
@@ -55,27 +84,50 @@ const userSchema = new mongoose.Schema({
 // Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
-  next();
+  
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    this.updatedAt = new Date();
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
-// Compare password method
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+// Validate password
+userSchema.methods.validatePassword = async function(password) {
+  return bcrypt.compare(password, this.password);
 };
 
-// Create verification token
-userSchema.methods.createVerificationToken = function() {
-  const verificationToken = crypto.randomBytes(32).toString('hex');
-  
-  this.verificationToken = crypto
+// Generate email verification token
+userSchema.methods.generateEmailVerificationToken = function() {
+  const token = crypto.randomBytes(32).toString('hex');
+  this.emailVerificationToken = crypto
     .createHash('sha256')
-    .update(verificationToken)
+    .update(token)
     .digest('hex');
-    
-  this.verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
-  
-  return verificationToken;
+  this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  return token;
+};
+
+// Generate phone verification code
+userSchema.methods.generatePhoneVerificationCode = function() {
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  this.phoneVerificationCode = code;
+  this.phoneVerificationExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  return code;
+};
+
+// Generate password reset token
+userSchema.methods.generatePasswordResetToken = function() {
+  const token = crypto.randomBytes(32).toString('hex');
+  this.passwordResetToken = crypto
+    .createHash('sha256')
+    .update(token)
+    .digest('hex');
+  this.passwordResetExpires = Date.now() + 1 * 60 * 60 * 1000; // 1 hour
+  return token;
 };
 
 const User = mongoose.model('User', userSchema);

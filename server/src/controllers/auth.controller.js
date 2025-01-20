@@ -1,192 +1,335 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import User from '../models/user.model.js';
-import mailService from '../services/mail.service.js';
-import { createError } from '../utils/error.js';
+import notificationService from '../services/notification.service.js';
 
-const signToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN
-  });
+// Helper function to generate tokens
+const generateTokens = (userId) => {
+  const accessToken = jwt.sign(
+    { userId },
+    process.env.JWT_SECRET,
+    { expiresIn: '15m' }
+  );
+  
+  const refreshToken = jwt.sign(
+    { userId },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+  
+  return { accessToken, refreshToken };
 };
 
-export const register = async (req, res, next) => {
+// Register new user
+export const register = async (req, res) => {
   try {
-    const { email, password, displayName } = req.body;
+    const {
+      displayName,
+      cosmicalName,
+      backupEmail,
+      phone,
+      password
+    } = req.body;
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return next(createError(400, 'Email already in use'));
+    // Validate cosmicalName format
+    if (!/^[a-z0-9]+$/.test(cosmicalName)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Cosmical name can only contain lowercase letters and numbers'
+      });
     }
 
+    // Check if cosmicalName is available
+    const existingCosmicalName = await User.findOne({ cosmicalName });
+    if (existingCosmicalName) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'This cosmical name is already taken'
+      });
+    }
+
+    // Check if phone is already registered
+    const existingPhone = await User.findOne({ phone });
+    if (existingPhone) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'This phone number is already registered'
+      });
+    }
+
+    // Check if backup email is already used
+    const existingBackupEmail = await User.findOne({ backupEmail });
+    if (existingBackupEmail) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'This backup email is already registered'
+      });
+    }
+
+    // Create cosmical.me email
+    const email = `${cosmicalName}@cosmical.me`;
+
     // Create new user
-    const user = await User.create({
+    const user = new User({
+      displayName,
+      cosmicalName,
       email,
-      password,
-      displayName
+      backupEmail,
+      phone,
+      password
     });
 
-    // Generate verification token
-    const verificationToken = user.createVerificationToken();
+    // Generate verification tokens
+    const emailToken = user.generateEmailVerificationToken();
+    const phoneCode = user.generatePhoneVerificationCode();
+
+    // Save user
     await user.save();
 
-    // Send verification email
-    await mailService.sendVerificationEmail(user.email, verificationToken);
-
-    // Create token
-    const token = signToken(user._id);
+    // Send verification emails and SMS
+    await Promise.all([
+      notificationService.sendVerificationEmail(email, emailToken),
+      notificationService.sendSmsVerification(phone, phoneCode)
+    ]);
 
     res.status(201).json({
       status: 'success',
-      token,
-      data: {
-        user: {
-          id: user._id,
-          email: user.email,
-          displayName: user.displayName,
-          isEmailVerified: user.isEmailVerified
-        }
-      }
+      message: 'Registration successful. Please check your email and phone for verification.'
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
   }
 };
 
-export const login = async (req, res, next) => {
+// Verify email
+export const verifyEmail = async (req, res) => {
   try {
-    const { email, password } = req.body;
-
-    // Check if email and password exist
-    if (!email || !password) {
-      return next(createError(400, 'Please provide email and password'));
-    }
-
-    // Check if user exists && password is correct
-    const user = await User.findOne({ email }).select('+password');
-    if (!user || !(await user.comparePassword(password))) {
-      return next(createError(401, 'Incorrect email or password'));
-    }
-
-    // Create token
-    const token = signToken(user._id);
-
-    res.status(200).json({
-      status: 'success',
-      token,
-      data: {
-        user: {
-          id: user._id,
-          email: user.email,
-          displayName: user.displayName,
-          isEmailVerified: user.isEmailVerified
-        }
-      }
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const verifyEmail = async (req, res, next) => {
-  try {
-    const { token } = req.params;
-
-    // Hash token
     const hashedToken = crypto
       .createHash('sha256')
-      .update(token)
+      .update(req.params.token)
       .digest('hex');
 
-    // Find user with token
     const user = await User.findOne({
-      verificationToken: hashedToken,
-      verificationTokenExpires: { $gt: Date.now() }
+      emailVerificationToken: hashedToken,
+      emailVerificationExpires: { $gt: Date.now() }
     });
 
     if (!user) {
-      return next(createError(400, 'Token is invalid or has expired'));
+      return res.status(400).json({
+        status: 'error',
+        message: 'Token is invalid or has expired'
+      });
     }
 
-    // Update user
     user.isEmailVerified = true;
-    user.verificationToken = undefined;
-    user.verificationTokenExpires = undefined;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
     await user.save();
 
-    // Send welcome email
-    await mailService.sendWelcomeEmail(user.email, user.displayName);
-
-    res.status(200).json({
+    res.json({
       status: 'success',
       message: 'Email verified successfully'
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
   }
 };
 
-export const forgotPassword = async (req, res, next) => {
+// Verify phone
+export const verifyPhone = async (req, res) => {
+  try {
+    const { phone, code } = req.body;
+
+    const user = await User.findOne({
+      phone,
+      phoneVerificationCode: code,
+      phoneVerificationExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Code is invalid or has expired'
+      });
+    }
+
+    user.isPhoneVerified = true;
+    user.phoneVerificationCode = undefined;
+    user.phoneVerificationExpires = undefined;
+    await user.save();
+
+    // If both email and phone are verified, initiate token distribution
+    if (user.isEmailVerified && user.isPhoneVerified && !user.tokensDistributed) {
+      // TODO: Implement token distribution
+      user.tokenBalance = 10000000; // 10M tokens
+      user.tokensDistributed = true;
+      await user.save();
+    }
+
+    res.json({
+      status: 'success',
+      message: 'Phone verified successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// Login user
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Find user by email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check password
+    const isValid = await user.validatePassword(password);
+    if (!isValid) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check if email is verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Please verify your email before logging in'
+      });
+    }
+
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Generate tokens
+    const tokens = generateTokens(user._id);
+
+    res.json({
+      status: 'success',
+      data: {
+        user: {
+          id: user._id,
+          displayName: user.displayName,
+          email: user.email,
+          isEmailVerified: user.isEmailVerified,
+          isPhoneVerified: user.isPhoneVerified,
+          tokenBalance: user.tokenBalance,
+          nftMinted: user.nftMinted
+        },
+        tokens
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// Request password reset
+export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    // Find user
     const user = await User.findOne({ email });
     if (!user) {
-      return next(createError(404, 'No user found with that email'));
+      return res.status(404).json({
+        status: 'error',
+        message: 'No account found with that email'
+      });
     }
 
-    // Generate reset token
-    const resetToken = user.createPasswordResetToken();
+    const resetToken = user.generatePasswordResetToken();
     await user.save();
 
-    // Send password reset email
-    await mailService.sendPasswordResetEmail(user.email, resetToken);
+    await notificationService.sendPasswordResetEmail(email, resetToken);
 
-    res.status(200).json({
+    res.json({
       status: 'success',
-      message: 'Password reset token sent to email'
+      message: 'Password reset instructions sent to your email'
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
   }
 };
 
-export const resetPassword = async (req, res, next) => {
+// Reset password
+export const resetPassword = async (req, res) => {
   try {
-    const { token } = req.params;
-    const { password } = req.body;
+    const { token, password } = req.body;
 
-    // Hash token
     const hashedToken = crypto
       .createHash('sha256')
       .update(token)
       .digest('hex');
 
-    // Find user with token
     const user = await User.findOne({
       passwordResetToken: hashedToken,
       passwordResetExpires: { $gt: Date.now() }
     });
 
     if (!user) {
-      return next(createError(400, 'Token is invalid or has expired'));
+      return res.status(400).json({
+        status: 'error',
+        message: 'Token is invalid or has expired'
+      });
     }
 
-    // Update password
     user.password = password;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     await user.save();
 
-    // Create new token
-    const newToken = signToken(user._id);
-
-    res.status(200).json({
+    res.json({
       status: 'success',
-      token: newToken
+      message: 'Password reset successful'
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// Refresh token
+export const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+    const tokens = generateTokens(decoded.userId);
+
+    res.json({
+      status: 'success',
+      data: { tokens }
+    });
+  } catch (error) {
+    res.status(401).json({
+      status: 'error',
+      message: 'Invalid refresh token'
+    });
   }
 };
