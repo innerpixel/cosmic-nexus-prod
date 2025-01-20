@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import User from '../models/user.model.js';
 import notificationService from '../services/notification.service.js';
+import crypto from 'crypto';
 
 // Helper function to generate tokens
 const generateTokens = (userId) => {
@@ -23,129 +24,73 @@ const generateTokens = (userId) => {
 // Register new user
 export const register = async (req, res) => {
   try {
-    const { email, password, displayName, termsAccepted, isTest } = req.body;
+    const { displayName, csmclName, regularEmail, simNumber, password, termsAccepted } = req.body;
 
-    // Validate terms acceptance first
-    if (!termsAccepted) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'You must accept the Terms of Service and Privacy Policy to register'
-      });
-    }
+    // Check if user already exists with either email
+    const existingUser = await User.findOne({
+      $or: [
+        { regularEmail },
+        { csmclName }
+      ]
+    });
 
-    // Check if email already exists before other validations
-    const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
         status: 'error',
-        message: 'Email already exists'
+        message: existingUser.regularEmail === regularEmail 
+          ? 'Email already registered' 
+          : 'CSMCL name already taken'
       });
-    }
-
-    // Validate required fields
-    if (!email || !password || !displayName) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Email, password, and display name are required'
-      });
-    }
-
-    // Skip validation for test users
-    if (!isTest) {
-      // Validate email format
-      const emailRegex = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/;
-      if (!emailRegex.test(email)) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Please enter a valid email address'
-        });
-      }
-
-      // Validate password strength
-      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-      if (!passwordRegex.test(password)) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Password must contain at least 8 characters, including uppercase, lowercase, number, and special character'
-        });
-      }
-
-      // Validate display name
-      const displayNameRegex = /^[a-zA-Z0-9\s-_]+$/;
-      if (!displayNameRegex.test(displayName)) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Display name can only contain letters, numbers, spaces, hyphens, and underscores'
-        });
-      }
-
-      if (displayName.length < 3 || displayName.length > 50) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Display name must be between 3 and 50 characters'
-        });
-      }
     }
 
     // Create new user
     const user = new User({
-      email,
-      password,
       displayName,
-      termsAccepted,
-      isTest: isTest || false
+      csmclName,
+      regularEmail,
+      simNumber,
+      password,
+      termsAccepted
     });
 
-    // Save user to database
-    await user.save();
+    // Generate verification tokens
+    const emailToken = crypto.randomBytes(32).toString('hex');
+    const simCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
 
-    // Generate verification token
-    const verificationToken = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET || 'test-jwt-secret',
-      { expiresIn: '24h' }
-    );
-
-    // Save verification token
-    user.emailVerificationToken = verificationToken;
+    user.emailVerificationToken = emailToken;
     user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    user.simVerificationCode = simCode;
+    user.simVerificationExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
     await user.save();
 
-    // Send verification email for non-test users
-    if (!isTest) {
-      await notificationService.sendVerificationEmail(email, verificationToken);
-    }
+    // Send verification email
+    await notificationService.sendVerificationEmail({
+      to: user.regularEmail,
+      token: emailToken
+    });
 
-    // Generate auth tokens
-    const { accessToken, refreshToken } = generateTokens(user._id);
+    // Send SMS verification
+    await notificationService.sendVerificationSMS({
+      to: user.simNumber,
+      code: simCode
+    });
 
     // Return success response
     return res.status(201).json({
       status: 'success',
+      message: 'Registration successful. Please verify your email and phone number.',
       data: {
         user: {
           _id: user._id,
-          email: user.email,
           displayName: user.displayName,
-          isEmailVerified: user.isEmailVerified
-        },
-        accessToken,
-        refreshToken
+          csmclName: user.csmclName,
+          regularEmail: user.regularEmail
+        }
       }
     });
   } catch (error) {
     console.error('Registration error:', error);
-    
-    // Handle validation errors
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        status: 'error',
-        message: messages.join(', ')
-      });
-    }
-
-    // Handle other errors
     return res.status(500).json({
       status: 'error',
       message: 'An error occurred while registering'
@@ -219,7 +164,6 @@ export const verifyEmail = async (req, res) => {
   try {
     const { token } = req.body;
 
-    // Find user with matching token
     const user = await User.findOne({
       emailVerificationToken: token,
       emailVerificationExpires: { $gt: Date.now() }
@@ -232,22 +176,45 @@ export const verifyEmail = async (req, res) => {
       });
     }
 
-    // Update user verification status
     user.isEmailVerified = true;
     user.emailVerificationToken = undefined;
     user.emailVerificationExpires = undefined;
+
+    // If both email and phone are verified, create system accounts
+    if (user.isSimVerified) {
+      // Create mail account on cosmical.me
+      if (!user.mailAccountCreated) {
+        await notificationService.createMailAccount({
+          username: user.csmclName,
+          password: crypto.randomBytes(16).toString('hex') // Generate secure password
+        });
+        user.mailAccountCreated = true;
+      }
+
+      // Create home directory on csmcl.space
+      if (!user.homeDirCreated) {
+        await notificationService.createUserHomeDir({
+          username: user.csmclName
+        });
+        user.homeDirCreated = true;
+      }
+    }
+
     await user.save();
 
-    // Return success response
     return res.status(200).json({
       status: 'success',
       message: 'Email verified successfully',
       data: {
         user: {
           _id: user._id,
-          email: user.email,
           displayName: user.displayName,
-          isEmailVerified: user.isEmailVerified
+          csmclName: user.csmclName,
+          regularEmail: user.regularEmail,
+          isEmailVerified: user.isEmailVerified,
+          isSimVerified: user.isSimVerified,
+          mailAccountCreated: user.mailAccountCreated,
+          homeDirCreated: user.homeDirCreated
         }
       }
     });
@@ -263,42 +230,35 @@ export const verifyEmail = async (req, res) => {
 // Verify phone
 export const verifyPhone = async (req, res) => {
   try {
-    const { phone, code } = req.body;
+    const { simNumber, code } = req.body;
 
     const user = await User.findOne({
-      phone,
-      phoneVerificationCode: code,
-      phoneVerificationExpires: { $gt: Date.now() }
+      simNumber,
+      simVerificationCode: code,
+      simVerificationExpires: { $gt: Date.now() }
     });
 
     if (!user) {
       return res.status(400).json({
         status: 'error',
-        message: 'Code is invalid or has expired'
+        message: 'Invalid or expired verification code'
       });
     }
 
-    user.isPhoneVerified = true;
-    user.phoneVerificationCode = undefined;
-    user.phoneVerificationExpires = undefined;
+    user.isSimVerified = true;
+    user.simVerificationCode = undefined;
+    user.simVerificationExpires = undefined;
     await user.save();
 
-    // If both email and phone are verified, initiate token distribution
-    if (user.isEmailVerified && user.isPhoneVerified && !user.tokensDistributed) {
-      // TODO: Implement token distribution
-      user.tokenBalance = 10000000; // 10M tokens
-      user.tokensDistributed = true;
-      await user.save();
-    }
-
-    res.json({
+    return res.status(200).json({
       status: 'success',
-      message: 'Phone verified successfully'
+      message: 'Phone number verified successfully'
     });
   } catch (error) {
-    res.status(500).json({
+    console.error('Phone verification error:', error);
+    return res.status(500).json({
       status: 'error',
-      message: error.message
+      message: 'An error occurred while verifying phone number'
     });
   }
 };
