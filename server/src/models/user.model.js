@@ -54,6 +54,16 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: undefined
   },
+  termsAccepted: {
+    type: Boolean,
+    required: [true, 'You must accept the Terms of Service and Privacy Policy to register'],
+    validate: {
+      validator: function(v) {
+        return v === true;
+      },
+      message: 'You must accept the Terms of Service and Privacy Policy to register'
+    }
+  },
   lastLogin: Date,
   isTest: {
     type: Boolean,

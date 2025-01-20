@@ -1,12 +1,12 @@
+import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { app } from '../../../src/app.js';
+import { User } from '../../../src/models/user.model.js';
 import bcrypt from 'bcrypt';
-import app from '../src/app.js';
-import User from '../src/models/user.model.js';
 import jwt from 'jsonwebtoken';
 
 // Mock the notification service
-vi.mock('../src/services/notification.service.js', () => ({
+vi.mock('../../../src/services/notification.service.js', () => ({
   default: {
     sendVerificationEmail: vi.fn(),
     sendSmsVerification: vi.fn()
@@ -14,15 +14,22 @@ vi.mock('../src/services/notification.service.js', () => ({
 }));
 
 // Import after mock to ensure proper mocking
-import notificationService from '../src/services/notification.service.js';
+import notificationService from '../../../src/services/notification.service.js';
 
 // Test user data
 const validUser = {
   email: 'test@example.com',
-  password: 'Test123!@#',  // Meets complexity requirements
+  password: 'ValidPass123!',
   displayName: 'Test User',
   terms: true,
   isTest: true
+};
+
+const invalidUser = {
+  email: 'invalid-email',
+  password: 'weak',
+  displayName: 'T',
+  terms: false
 };
 
 describe('Authentication API', () => {
@@ -80,6 +87,15 @@ describe('Authentication API', () => {
       expect(res.status).toBe(400);
       expect(res.body.status).toBe('error');
       expect(res.body.message).toBe('Email already exists');
+    });
+
+    it('should not register user with invalid data', async () => {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send(invalidUser);
+
+      expect(res.status).toBe(400);
+      expect(res.body.status).toBe('error');
     });
   });
 

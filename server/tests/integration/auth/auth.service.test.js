@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
-import { User } from '../../../src/models/user.model.js';
+import User from '../../../src/models/user.model.js';
 import { generateTokens } from '../../../src/services/auth.service.js';
 
 describe('Authentication Service Tests', () => {

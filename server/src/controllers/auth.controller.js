@@ -29,7 +29,7 @@ export const register = async (req, res) => {
     if (!terms) {
       return res.status(400).json({
         status: 'error',
-        message: 'Terms must be accepted'
+        message: 'You must accept the Terms of Service and Privacy Policy to register'
       });
     }
 
@@ -92,7 +92,8 @@ export const register = async (req, res) => {
       email,
       password,
       displayName,
-      isTest
+      termsAccepted: terms,
+      isTest: isTest || false
     });
 
     // Save user to database

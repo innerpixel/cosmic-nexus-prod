@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import mongoose from 'mongoose';
-import { User } from '../../../src/models/user.model.js';
+import User from '../../../src/models/user.model.js';
 
 describe('User Model Tests', () => {
   beforeEach(async () => {
@@ -83,6 +83,45 @@ describe('User Model Tests', () => {
       });
 
       await expect(userWithLongDisplayName.save()).rejects.toThrow();
+    });
+  });
+
+  describe('Terms Validation', () => {
+    it('should validate user with accepted terms', async () => {
+      const userWithTerms = new User({
+        email: 'test@example.com',
+        password: 'ValidPass123!',
+        displayName: 'Test User',
+        termsAccepted: true,
+        isTest: true
+      });
+
+      const savedUser = await userWithTerms.save();
+      expect(savedUser._id).toBeDefined();
+      expect(savedUser.termsAccepted).toBe(true);
+    });
+
+    it('should fail validation when terms are not accepted', async () => {
+      const userWithoutTerms = new User({
+        email: 'test@example.com',
+        password: 'ValidPass123!',
+        displayName: 'Test User',
+        termsAccepted: false,
+        isTest: true
+      });
+
+      await expect(userWithoutTerms.save()).rejects.toThrow();
+    });
+
+    it('should fail validation when terms field is missing', async () => {
+      const userWithoutTermsField = new User({
+        email: 'test@example.com',
+        password: 'ValidPass123!',
+        displayName: 'Test User',
+        isTest: true
+      });
+
+      await expect(userWithoutTermsField.save()).rejects.toThrow();
     });
   });
 
