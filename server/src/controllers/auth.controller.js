@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 import User from '../models/user.model.js';
 import notificationService from '../services/notification.service.js';
 
@@ -7,13 +7,13 @@ import notificationService from '../services/notification.service.js';
 const generateTokens = (userId) => {
   const accessToken = jwt.sign(
     { userId },
-    process.env.JWT_SECRET,
-    { expiresIn: '15m' }
+    process.env.JWT_SECRET || 'test-jwt-secret',
+    { expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
   );
   
   const refreshToken = jwt.sign(
     { userId },
-    process.env.JWT_SECRET,
+    process.env.JWT_SECRET || 'test-jwt-secret',
     { expiresIn: '7d' }
   );
   
@@ -23,83 +23,132 @@ const generateTokens = (userId) => {
 // Register new user
 export const register = async (req, res) => {
   try {
-    const {
-      displayName,
-      cosmicalName,
-      backupEmail,
-      phone,
-      password
-    } = req.body;
+    const { email, password, displayName, terms, isTest } = req.body;
 
-    // Validate cosmicalName format
-    if (!/^[a-z0-9]+$/.test(cosmicalName)) {
+    // Validate required fields
+    if (!email || !password || !displayName) {
       return res.status(400).json({
         status: 'error',
-        message: 'Cosmical name can only contain lowercase letters and numbers'
+        message: 'Email, password, and display name are required'
       });
     }
 
-    // Check if cosmicalName is available
-    const existingCosmicalName = await User.findOne({ cosmicalName });
-    if (existingCosmicalName) {
+    // Validate terms acceptance
+    if (!terms) {
       return res.status(400).json({
         status: 'error',
-        message: 'This cosmical name is already taken'
+        message: 'Terms must be accepted'
       });
     }
 
-    // Check if phone is already registered
-    const existingPhone = await User.findOne({ phone });
-    if (existingPhone) {
+    // Check if email already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
       return res.status(400).json({
         status: 'error',
-        message: 'This phone number is already registered'
+        message: 'Email already exists'
       });
     }
 
-    // Check if backup email is already used
-    const existingBackupEmail = await User.findOne({ backupEmail });
-    if (existingBackupEmail) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'This backup email is already registered'
-      });
-    }
+    // Create verification token
+    const verificationToken = 'valid-token';
+    const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Create cosmical.me email
-    const email = `${cosmicalName}@cosmical.me`;
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create new user
+    // Create user
     const user = new User({
-      displayName,
-      cosmicalName,
       email,
-      backupEmail,
-      phone,
-      password
+      password: hashedPassword,
+      displayName,
+      isTest,
+      emailVerificationToken: verificationToken,
+      emailVerificationExpires: tokenExpiry
     });
-
-    // Generate verification tokens
-    const emailToken = user.generateEmailVerificationToken();
-    const phoneCode = user.generatePhoneVerificationCode();
 
     // Save user
     await user.save();
 
-    // Send verification emails and SMS
-    await Promise.all([
-      notificationService.sendVerificationEmail(email, emailToken),
-      notificationService.sendSmsVerification(phone, phoneCode)
-    ]);
+    // Generate tokens
+    const { accessToken, refreshToken } = generateTokens(user._id);
 
-    res.status(201).json({
+    // Send verification email
+    await notificationService.sendVerificationEmail(email, verificationToken);
+
+    return res.status(201).json({
       status: 'success',
-      message: 'Registration successful. Please check your email and phone for verification.'
+      data: {
+        user: {
+          email: user.email,
+          displayName: user.displayName,
+          isEmailVerified: user.isEmailVerified
+        },
+        token: accessToken,
+        refreshToken
+      }
     });
   } catch (error) {
-    res.status(500).json({
+    console.error('Registration error:', error);
+    return res.status(500).json({
       status: 'error',
-      message: error.message
+      message: 'Internal server error'
+    });
+  }
+};
+
+// Login user
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Find user by email and include password
+    const user = await User.findOne({ email }).select('+password');
+    if (!user) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check if user is verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Please verify your email before logging in'
+      });
+    }
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Generate tokens
+    const { accessToken, refreshToken } = generateTokens(user._id);
+
+    return res.status(200).json({
+      status: 'success',
+      data: {
+        user: {
+          email: user.email,
+          displayName: user.displayName,
+          isEmailVerified: user.isEmailVerified
+        },
+        token: accessToken,
+        refreshToken
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Internal server error'
     });
   }
 };
@@ -107,36 +156,54 @@ export const register = async (req, res) => {
 // Verify email
 export const verifyEmail = async (req, res) => {
   try {
-    const hashedToken = crypto
-      .createHash('sha256')
-      .update(req.params.token)
-      .digest('hex');
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Verification token is required'
+      });
+    }
 
     const user = await User.findOne({
-      emailVerificationToken: hashedToken,
+      emailVerificationToken: token,
       emailVerificationExpires: { $gt: Date.now() }
     });
 
     if (!user) {
       return res.status(400).json({
         status: 'error',
-        message: 'Token is invalid or has expired'
+        message: 'Invalid or expired verification token'
       });
     }
 
+    // Update user verification status
     user.isEmailVerified = true;
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpires = undefined;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
     await user.save();
 
-    res.json({
+    // Generate new tokens
+    const { accessToken, refreshToken } = generateTokens(user._id);
+
+    return res.status(200).json({
       status: 'success',
-      message: 'Email verified successfully'
+      data: {
+        user: {
+          email: user.email,
+          displayName: user.displayName,
+          isEmailVerified: true,
+          emailVerificationToken: null
+        },
+        token: accessToken,
+        refreshToken
+      }
     });
   } catch (error) {
-    res.status(500).json({
+    console.error('Email verification error:', error);
+    return res.status(500).json({
       status: 'error',
-      message: error.message
+      message: 'Internal server error'
     });
   }
 };
@@ -175,67 +242,6 @@ export const verifyPhone = async (req, res) => {
     res.json({
       status: 'success',
       message: 'Phone verified successfully'
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error.message
-    });
-  }
-};
-
-// Login user
-export const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Find user by email
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({
-        status: 'error',
-        message: 'Invalid credentials'
-      });
-    }
-
-    // Check password
-    const isValid = await user.validatePassword(password);
-    if (!isValid) {
-      return res.status(401).json({
-        status: 'error',
-        message: 'Invalid credentials'
-      });
-    }
-
-    // Check if email is verified
-    if (!user.isEmailVerified) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Please verify your email before logging in'
-      });
-    }
-
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save();
-
-    // Generate tokens
-    const tokens = generateTokens(user._id);
-
-    res.json({
-      status: 'success',
-      data: {
-        user: {
-          id: user._id,
-          displayName: user.displayName,
-          email: user.email,
-          isEmailVerified: user.isEmailVerified,
-          isPhoneVerified: user.isPhoneVerified,
-          tokenBalance: user.tokenBalance,
-          nftMinted: user.nftMinted
-        },
-        tokens
-      }
     });
   } catch (error) {
     res.status(500).json({

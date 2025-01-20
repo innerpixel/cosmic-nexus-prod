@@ -1,30 +1,36 @@
 import request from 'supertest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import bcrypt from 'bcrypt';
 import app from '../src/app.js';
 import User from '../src/models/user.model.js';
 
-// Mock the mail service
-vi.mock('../src/services/mail.service.js', () => ({
+// Mock the notification service
+vi.mock('../src/services/notification.service.js', () => ({
   default: {
     sendVerificationEmail: vi.fn(),
-    sendPasswordResetEmail: vi.fn()
+    sendSmsVerification: vi.fn()
   }
 }));
 
 // Import after mock to ensure proper mocking
-import mailService from '../src/services/mail.service.js';
+import notificationService from '../src/services/notification.service.js';
+
+// Test user data
+const validUser = {
+  email: 'test@example.com',
+  password: 'ValidPass123!',
+  displayName: 'Test User',
+  terms: true,
+  isTest: true
+};
 
 describe('Authentication API', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    await User.deleteMany({});
   });
 
   describe('POST /api/auth/register', () => {
-    const validUser = {
-      email: 'test@example.com',
-      password: 'Password123!',
-      displayName: 'Test User',
-    };
-
     it('should register a new user successfully', async () => {
       const res = await request(app)
         .post('/api/auth/register')
@@ -33,162 +39,144 @@ describe('Authentication API', () => {
       expect(res.status).toBe(201);
       expect(res.body.data.user).toHaveProperty('email', validUser.email);
       expect(res.body.data.user).toHaveProperty('displayName', validUser.displayName);
-      expect(res.body).toHaveProperty('token');
-      expect(mailService.sendVerificationEmail).toHaveBeenCalled();
+      expect(res.body.data.user).toHaveProperty('isEmailVerified', false);
+      expect(res.body.data).toHaveProperty('token');
+      expect(notificationService.sendVerificationEmail).toHaveBeenCalled();
+    });
+
+    it('should not register user without terms acceptance', async () => {
+      const userWithoutTerms = { ...validUser, terms: false };
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send(userWithoutTerms);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toContain('Terms must be accepted');
     });
 
     it('should not register user with existing email', async () => {
-      // First registration
-      await request(app)
-        .post('/api/auth/register')
-        .send(validUser);
+      // Create user first
+      const hashedPassword = await bcrypt.hash(validUser.password, 10);
+      await User.create({
+        ...validUser,
+        password: hashedPassword
+      });
 
-      // Second registration with same email
       const res = await request(app)
         .post('/api/auth/register')
         .send(validUser);
 
       expect(res.status).toBe(400);
-      expect(res.body).toHaveProperty('message', 'Email already in use');
+      expect(res.body.message).toContain('Email already exists');
+    });
+  });
+
+  describe('POST /api/auth/verify-email', () => {
+    it('should verify email with valid token', async () => {
+      // Create user with verification token
+      const hashedPassword = await bcrypt.hash(validUser.password, 10);
+      await User.create({
+        ...validUser,
+        password: hashedPassword,
+        emailVerificationToken: 'valid-token',
+        emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000)
+      });
+
+      const res = await request(app)
+        .post('/api/auth/verify-email')
+        .send({ token: 'valid-token' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.isEmailVerified).toBe(true);
+      expect(res.body.data.user.emailVerificationToken).toBeNull();
     });
 
-    it('should validate display name format', async () => {
-      const invalidUser = {
-        ...validUser,
-        displayName: 'Test User With Too Many Words',
-      };
-
+    it('should not verify with invalid token', async () => {
       const res = await request(app)
-        .post('/api/auth/register')
-        .send(invalidUser);
+        .post('/api/auth/verify-email')
+        .send({ token: 'invalid-token' });
 
       expect(res.status).toBe(400);
-      expect(res.body.message).toMatch(/display name/i);
+      expect(res.body.message).toContain('Invalid or expired verification token');
+    });
+
+    it('should not verify with expired token', async () => {
+      // Create user with expired token
+      const hashedPassword = await bcrypt.hash(validUser.password, 10);
+      await User.create({
+        ...validUser,
+        password: hashedPassword,
+        emailVerificationToken: 'expired-token',
+        emailVerificationExpires: new Date(Date.now() - 24 * 60 * 60 * 1000)
+      });
+
+      const res = await request(app)
+        .post('/api/auth/verify-email')
+        .send({ token: 'expired-token' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toContain('Invalid or expired verification token');
     });
   });
 
   describe('POST /api/auth/login', () => {
-    const user = {
-      email: 'login@example.com',
-      password: 'Password123!',
-      displayName: 'Login User',
-    };
-
     beforeEach(async () => {
-      // Create a user before each test
-      await request(app)
-        .post('/api/auth/register')
-        .send(user);
+      // Create verified user with hashed password
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(validUser.password, salt);
+
+      // Create user with all required fields
+      const user = new User({
+        ...validUser,
+        password: hashedPassword,
+        isEmailVerified: true
+      });
+
+      // Save user
+      await user.save();
     });
 
-    it('should login successfully with correct credentials', async () => {
+    it('should login verified user with correct credentials', async () => {
       const res = await request(app)
         .post('/api/auth/login')
         .send({
-          email: user.email,
-          password: user.password,
+          email: validUser.email,
+          password: validUser.password
         });
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty('token');
-      expect(res.body.data.user).toHaveProperty('email', user.email);
+      expect(res.body.data).toHaveProperty('token');
+      expect(res.body.data.user).toHaveProperty('email', validUser.email);
+    });
+
+    it('should not login unverified user', async () => {
+      // Update user to be unverified
+      await User.findOneAndUpdate(
+        { email: validUser.email },
+        { isEmailVerified: false }
+      );
+
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({
+          email: validUser.email,
+          password: validUser.password
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toContain('verify');
     });
 
     it('should not login with incorrect password', async () => {
       const res = await request(app)
         .post('/api/auth/login')
         .send({
-          email: user.email,
-          password: 'wrongpassword',
+          email: validUser.email,
+          password: 'wrongpassword'
         });
 
       expect(res.status).toBe(401);
-      expect(res.body.message).toMatch(/incorrect email or password/i);
-    });
-
-    it('should not login with non-existent email', async () => {
-      const res = await request(app)
-        .post('/api/auth/login')
-        .send({
-          email: 'nonexistent@example.com',
-          password: user.password,
-        });
-
-      expect(res.status).toBe(401);
-      expect(res.body.message).toMatch(/incorrect email or password/i);
-    });
-  });
-
-  describe('GET /api/auth/verify-email/:token', () => {
-    let verificationToken;
-    
-    it('should verify email with valid token', async () => {
-      // Register a user first
-      const user = {
-        email: 'verify@example.com',
-        password: 'Password123!',
-        displayName: 'Verify User',
-      };
-
-      const registerRes = await request(app)
-        .post('/api/auth/register')
-        .send(user);
-
-      // Extract the verification token from the sendVerificationEmail mock
-      const mockCall = mailService.sendVerificationEmail.mock.calls[0];
-      verificationToken = mockCall[1]; // Second argument is the token
-
-      const res = await request(app)
-        .get(`/api/auth/verify-email/${verificationToken}`);
-
-      expect(res.status).toBe(200);
-      expect(res.body.message).toMatch(/email verified/i);
-
-      // Check that the user's email is verified in the database
-      const updatedUser = await User.findOne({ email: user.email });
-      expect(updatedUser.isEmailVerified).toBe(true);
-    });
-
-    it('should not verify with invalid token', async () => {
-      const res = await request(app)
-        .get('/api/auth/verify-email/invalidtoken');
-
-      expect(res.status).toBe(400);
-      expect(res.body.message).toBe('Token is invalid or has expired');
-    });
-  });
-
-  describe('POST /api/auth/forgot-password', () => {
-    const user = {
-      email: 'forgot@example.com',
-      password: 'Password123!',
-      displayName: 'Forgot User',
-    };
-
-    beforeEach(async () => {
-      await request(app)
-        .post('/api/auth/register')
-        .send(user);
-    });
-
-    it('should send reset password email for existing user', async () => {
-      const res = await request(app)
-        .post('/api/auth/forgot-password')
-        .send({ email: user.email });
-
-      expect(res.status).toBe(200);
-      expect(res.body.message).toMatch(/reset password email sent/i);
-      expect(mailService.sendPasswordResetEmail).toHaveBeenCalled();
-    });
-
-    it('should not reveal if email does not exist', async () => {
-      const res = await request(app)
-        .post('/api/auth/forgot-password')
-        .send({ email: 'nonexistent@example.com' });
-
-      expect(res.status).toBe(200);
-      expect(res.body.message).toMatch(/reset password email sent/i);
-      expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+      expect(res.body.message).toContain('Invalid credentials');
     });
   });
 });

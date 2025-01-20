@@ -9,7 +9,7 @@ router.use(rateLimiter);
 
 router.post('/register', register);
 router.post('/login', login);
-router.get('/verify-email/:token', verifyEmail);
+router.post('/verify-email', verifyEmail);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password/:token', resetPassword);
 
