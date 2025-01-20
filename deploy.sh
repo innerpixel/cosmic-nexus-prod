@@ -15,11 +15,12 @@ scp -i ~/.ssh/id_ed25519 -r dist/* root@147.93.58.192:/var/www/cosmic-nexus/fron
 echo "Deploying backend..."
 cd server
 CI=true npm run build
-scp -i ~/.ssh/id_ed25519 -r package.json .env dist/* root@147.93.58.192:/var/www/cosmic-nexus/backend/
+ssh -i ~/.ssh/id_ed25519 root@147.93.58.192 "rm -rf /var/www/cosmic-nexus/backend/dist/* && mkdir -p /var/www/cosmic-nexus/backend/dist"
+scp -i ~/.ssh/id_ed25519 -r package.json .env dist/* root@147.93.58.192:/var/www/cosmic-nexus/backend/dist/
 
 # Setup and start the application on VPS
 ssh -i ~/.ssh/id_ed25519 root@147.93.58.192 "bash -s" << 'EOF'
-cd /var/www/cosmic-nexus/backend
+cd /var/www/cosmic-nexus/backend/dist
 npm install --production
 
 # Gracefully stop the existing service if running
@@ -34,10 +35,10 @@ After=network.target mongod.service
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/var/www/cosmic-nexus/backend
+WorkingDirectory=/var/www/cosmic-nexus/backend/dist
 Environment=PORT=5000
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/node dist/index.js
+ExecStart=/usr/bin/node index.js
 Restart=always
 
 [Install]
