@@ -2,7 +2,7 @@
 
 # Build frontend
 echo "Building frontend..."
-npm run build
+CI=true npm run build
 
 # Create deployment directory on VPS
 ssh -i ~/.ssh/id_ed25519 root@147.93.58.192 "mkdir -p /var/www/cosmic-nexus/{frontend,backend}"
@@ -14,7 +14,7 @@ scp -i ~/.ssh/id_ed25519 -r dist/* root@147.93.58.192:/var/www/cosmic-nexus/fron
 # Copy backend files to VPS
 echo "Deploying backend..."
 cd server
-npm run build
+CI=true npm run build
 scp -i ~/.ssh/id_ed25519 -r package.json .env dist/* root@147.93.58.192:/var/www/cosmic-nexus/backend/
 
 # Setup and start the application on VPS
