@@ -9,26 +9,59 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    
+    env:
+      NODE_VERSION: '18'
 
     steps:
-      - name: Install SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H csmcl.space >> ~/.ssh/known_hosts
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Test SSH Connection
-        run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no root@csmcl.space 'echo "SSH connection successful"'
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
-      - name: Deploy
-        if: success()
-        run: |
-          ssh -i ~/.ssh/deploy_key root@csmcl.space '
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: csmcl.space
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          debug: true
+          script: |
+            echo "Starting deployment at $(date)"
+            
+            # Navigate to project directory
             cd /var/www/csmcl.space
+            
+            # Pull latest changes
             git pull origin main
-            cd frontend && npm ci && npm run build
-            cd ../backend && npm ci
+            
+            # Frontend deployment
+            echo "Deploying frontend..."
+            cd frontend
+            npm ci
+            npm run build
+            
+            # Backend deployment
+            echo "Deploying backend..."
+            cd ../backend
+            npm ci
+            
+            # Restart service
+            echo "Restarting service..."
             sudo systemctl restart csmcl-space
-          '
+            
+            # Verify service status
+            echo "Service status:"
+            sudo systemctl status csmcl-space --no-pager
+            
+            # Check if service is running
+            if ! systemctl is-active --quiet csmcl-space; then
+              echo "Service failed to start"
+              exit 1
+            fi
+            
+            echo "Deployment completed successfully at $(date)"
