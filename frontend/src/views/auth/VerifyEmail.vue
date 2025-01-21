@@ -82,7 +82,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { CheckCircleIcon } from '@heroicons/vue/24/outline'
@@ -99,16 +99,27 @@ const error = ref('')
 const resendLoading = ref(false)
 const resendCooldown = ref(0)
 const cooldownInterval = ref(null)
+const userEmail = ref('')
 
 const simVerified = computed(() => authStore.isSimVerified)
 
 onMounted(async () => {
   const token = route.query.token
+  const email = route.query.email
+  
   if (!token) {
     error.value = 'Verification token is missing'
     loading.value = false
     return
   }
+
+  if (!email) {
+    error.value = 'Email is missing'
+    loading.value = false
+    return
+  }
+
+  userEmail.value = email
 
   try {
     const response = await authStore.verifyEmail(token)
@@ -140,7 +151,7 @@ const resendVerification = async () => {
 
   try {
     resendLoading.value = true
-    const response = await authStore.resendVerificationEmail()
+    const response = await authStore.resendVerificationEmail(userEmail.value)
     if (response.status === 'success') {
       startCooldown()
     } else {

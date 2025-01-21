@@ -19,9 +19,9 @@ const userSchema = new mongoose.Schema({
     minlength: [3, 'CSMCL name must be at least 3 characters long'],
     maxlength: [30, 'CSMCL name cannot exceed 30 characters']
   },
-  email: {
+  regularEmail: {
     type: String,
-    required: [true, 'Email is required'],
+    required: [true, 'Regular email is required'],
     unique: true,
     trim: true,
     lowercase: true,
@@ -29,37 +29,63 @@ const userSchema = new mongoose.Schema({
   },
   cosmicalEmail: {
     type: String,
+    required: [true, 'Cosmical email is required'],
     unique: true,
-    sparse: true,
     trim: true,
     lowercase: true
+  },
+  simNumber: {
+    type: String,
+    required: [true, 'SIM number is required'],
+    unique: true,
+    trim: true,
+    match: [/^\+?[1-9]\d{1,14}$/, 'Please enter a valid phone number']
   },
   password: {
     type: String,
     required: [true, 'Password is required'],
-    minlength: [8, 'Password must be at least 8 characters long'],
-    select: false
+    minlength: [8, 'Password must be at least 8 characters long']
   },
   isEmailVerified: {
     type: Boolean,
     default: false
   },
-  emailVerificationToken: String,
-  emailVerificationExpires: Date,
-  resetPasswordToken: String,
-  resetPasswordExpires: Date,
-  lastLogin: Date,
+  isSimVerified: {
+    type: Boolean,
+    default: false
+  },
+  hasMailAccount: {
+    type: Boolean,
+    default: false
+  },
+  hasHomeDir: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationToken: {
+    type: String,
+    select: false
+  },
+  emailVerificationExpires: {
+    type: Date,
+    select: false
+  },
   createdAt: {
     type: Date,
     default: Date.now
   },
-  updatedAt: Date
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
 }, {
   timestamps: true
 });
 
-// Pre-save middleware to hash password
+// Hash password before saving
 userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -69,20 +95,12 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Pre-save middleware to generate cosmical.me email
-userSchema.pre('save', function(next) {
-  if (this.isNew && this.csmclName) {
-    this.cosmicalEmail = `${this.csmclName}@cosmical.me`;
-  }
-  next();
-});
-
 // Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
   try {
     return await bcrypt.compare(candidatePassword, this.password);
   } catch (error) {
-    return false;
+    throw error;
   }
 };
 

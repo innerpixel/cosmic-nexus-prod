@@ -167,9 +167,13 @@ const validationSchema = toFormValidator(
 const handleSubmit = async (values) => {
   try {
     error.value = ''
+    // Only send the expected fields
     const response = await authStore.register({
-      ...values,
-      email: `${values.csmclName}@cosmical.me`
+      displayName: values.displayName,
+      csmclName: values.csmclName,
+      regularEmail: values.regularEmail,
+      simNumber: values.simNumber,
+      password: values.password
     })
     
     if (response.status === 'success') {

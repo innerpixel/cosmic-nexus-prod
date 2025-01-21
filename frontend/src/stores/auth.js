@@ -183,13 +183,30 @@ export const useAuthStore = defineStore('auth', () => {
   // Reset Password
   const resetPassword = async ({ token, password }) => {
     try {
-      loading.value = true
-      const response = await axios.post(`${API_URL}/auth/reset-password`, { token, password })
+      const response = await axios.post(`${API_URL}/auth/reset-password/${token}`, { password })
       return response.data
     } catch (error) {
       throw error
     } finally {
       loading.value = false
+    }
+  }
+
+  // Resend verification email
+  const resendVerificationEmail = async (email) => {
+    try {
+      if (!email) {
+        throw new Error('Email is required')
+      }
+      
+      console.log('Resending verification email to:', email)
+      const response = await axios.post(`${API_URL}/auth/resend-verification`, {
+        email: email
+      })
+      return response.data
+    } catch (error) {
+      console.error('Failed to resend verification:', error)
+      throw error
     }
   }
 
@@ -221,6 +238,7 @@ export const useAuthStore = defineStore('auth', () => {
     verifyEmail,
     verifyPhone,
     forgotPassword,
-    resetPassword
+    resetPassword,
+    resendVerificationEmail
   }
 })

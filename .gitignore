@@ -15,13 +15,13 @@ dist
 dist-ssr
 *.local
 
-# Environment files
-.env
-.env.development
-.env.production
-.env.test
-.env.*
-!.env.example
+# # Environment files
+# .env
+# .env.development
+# .env.production
+# .env.test
+# .env.*
+# !.env.example
 
 # Editor directories and files
 .vscode/*

@@ -113,7 +113,7 @@ export const register = async (req, res) => {
 
       // Send verification email
       console.log('Sending verification email...');
-      await emailAccountService.sendVerificationEmail(user.regularEmail, emailToken);
+      await emailAccountService.sendVerificationEmail(user.regularEmail, emailToken, user.displayName);
       console.log('Verification email sent successfully');
     } catch (error) {
       // If anything fails after creating resources, clean up
@@ -257,7 +257,15 @@ export const login = async (req, res) => {
 // Verify email
 export const verifyEmail = async (req, res) => {
   try {
-    const { token } = req.body;
+    const { token } = req.query;
+
+    if (!token) {
+      console.error('No verification token provided');
+      return res.status(400).json({
+        status: 'error',
+        message: 'Verification token is required'
+      });
+    }
 
     const user = await User.findOne({
       emailVerificationToken: token,
@@ -514,6 +522,64 @@ export const logout = async (req, res) => {
     return res.status(500).json({
       status: 'error',
       message: 'An error occurred while logging out'
+    });
+  }
+};
+
+// Resend verification email
+export const resendVerificationEmail = async (req, res) => {
+  try {
+    // Get email from authenticated user or request body
+    const email = req.user?.regularEmail || req.body.email;
+
+    if (!email) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email is required'
+      });
+    }
+
+    console.log('Attempting to resend verification email to:', email);
+
+    const user = await User.findOne({ regularEmail: email });
+    
+    if (!user) {
+      console.error('User not found for email:', email);
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    if (user.isEmailVerified) {
+      console.log('Email already verified for:', email);
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email is already verified'
+      });
+    }
+
+    // Generate new verification token
+    const emailToken = crypto.randomBytes(32).toString('hex');
+    user.emailVerificationToken = emailToken;
+    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await user.save();
+    console.log('Generated new verification token for:', email);
+
+    // Send verification email
+    await emailAccountService.sendVerificationEmail(user.regularEmail, emailToken, user.displayName);
+    console.log('Sent verification email to:', email);
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Verification email sent successfully'
+    });
+  } catch (error) {
+    console.error('Failed to resend verification email:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to resend verification email'
     });
   }
 };

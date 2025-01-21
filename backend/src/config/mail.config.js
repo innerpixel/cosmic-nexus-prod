@@ -1,13 +1,14 @@
 export const mailConfig = {
-  // SMTP Configuration for mail.cosmical.me
+  // SMTP Configuration
   smtp: {
-    host: 'mail.cosmical.me',
-    port: 25,
-    secure: false,
-    auth: {
+    host: process.env.NODE_ENV === 'development' ? 'localhost' : 'mail.cosmical.me',
+    port: parseInt(process.env.MAIL_PORT) || (process.env.NODE_ENV === 'development' ? 1025 : 25),
+    secure: false, // Use TLS in production
+    auth: process.env.NODE_ENV === 'development' ? null : {
       user: process.env.MAIL_USER,
       pass: process.env.MAIL_PASSWORD
     },
+    ignoreTLS: process.env.NODE_ENV === 'development',
     tls: {
       rejectUnauthorized: false
     },
@@ -16,17 +17,16 @@ export const mailConfig = {
   },
 
   // Mail domain configuration
-  domain: process.env.MAIL_DOMAIN || 'cosmical.me',
+  domain: process.env.NODE_ENV === 'development' ? 'localhost' : 'cosmical.me',
   
   // Development settings
   development: {
     prefix: process.env.DEV_PREFIX || 'dev-',
-    quotaMB: parseInt(process.env.DEV_QUOTA_MB) || 100,
-    useTestAccount: process.env.NODE_ENV === 'development'
+    quotaMB: parseInt(process.env.DEV_QUOTA_MB) || 100
   }
 };
 
-// Override SMTP settings in development mode
-if (process.env.NODE_ENV === 'development') {
-  console.log('Development mode: Mail server will use ethereal.email for testing');
-}
+// Log configuration
+const { host, port, secure } = mailConfig.smtp;
+const mode = process.env.NODE_ENV || 'production';
+console.log(`Email service running in ${mode} mode using ${host}:${port} (secure: ${secure})`);

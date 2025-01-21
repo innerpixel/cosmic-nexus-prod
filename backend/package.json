@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
+    "restart":"kill $(lsof -t -i:5000) 2>/dev/null || true; npm start",
+    "dev": "nodemon src/index.js",
     "test": "vitest",
     "test:emails": "node src/scripts/test-emails.js",
     "test:users": "node src/scripts/test-user-flows.js"
