@@ -1,10 +1,12 @@
 name: Deploy to Production
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      deploy_reason:
+        description: 'Reason for deployment'
+        required: false
+        default: 'Manual deployment'
 
 jobs:
   deploy:
@@ -32,6 +34,7 @@ jobs:
           debug: true
           script: |
             echo "Starting deployment at $(date)"
+            echo "Deployment reason: ${{ github.event.inputs.deploy_reason }}"
             
             # Navigate to project directory
             cd /var/www/csmcl.space
