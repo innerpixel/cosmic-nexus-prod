@@ -1,0 +1,24 @@
+[Unit]
+Description=Cosmic Nexus Web Application
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/csmcl.space
+Environment=NODE_ENV=production
+Environment=PORT=3000
+ExecStart=/usr/bin/node server/dist/index.js
+Restart=always
+RestartSec=10
+
+# Security permissions
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/www/csmcl.space/storage
+
+[Install]
+WantedBy=multi-user.target

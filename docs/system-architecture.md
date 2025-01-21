@@ -16,6 +16,7 @@ CSMCL SPACE is a decentralized platform that combines traditional web services w
   - User email accounts (`username@cosmical.me`)
   - No web content hosting
   - Strict email security policies
+  - Complete email authentication suite
 
 #### 2. Web Server (`csmcl.space`)
 - **Purpose**: Web application and user space hosting
@@ -27,7 +28,7 @@ CSMCL SPACE is a decentralized platform that combines traditional web services w
   - Web application hosting
   - User home directories
   - Public space data storage
-  - No mail services
+  - No mail services or email handling
 
 ### Application Architecture
 
@@ -52,6 +53,91 @@ CSMCL SPACE is a decentralized platform that combines traditional web services w
   - Mail server account creation
   - Web server space allocation
   - Blockchain interaction (planned)
+
+### Email System Architecture
+
+#### 1. Domain Separation and Responsibilities
+
+##### Mail Server (`cosmical.me`)
+- **Primary Role**: Email service delivery and SMTP handling
+- **Server Configuration**:
+  - Host: `mail.cosmical.me`
+  - Port: 587 (STARTTLS)
+  - Protocol: SMTP
+- **Security Features**:
+  - DKIM signatures
+  - SPF records
+  - DMARC policies
+  - STARTTLS encryption
+- **Account Structure**:
+  - Format: `username@cosmical.me`
+  - Development prefix: `dev-` (development environment only)
+  - Quota management per account
+
+##### Web Server (`csmcl.space`)
+- **Primary Role**: Web application and API services
+- **API Endpoints Structure**:
+  ```
+  Base URL: https://mail.cosmical.me/api/v1
+  
+  Email Account Management:
+  - Create Account:  POST   /mail/accounts
+  - Check Account:   GET    /mail/accounts/:username
+  - Delete Account:  DELETE /mail/accounts/:username
+  ```
+- **Authentication**:
+  - Basic Authentication
+  - Admin credentials required for account management
+  - JWT for user sessions
+
+#### 2. Integration Flow
+
+1. **Account Creation Process**:
+   ```
+   User Registration
+   └─> Web Server (csmcl.space)
+       ├─> Validates request
+       ├─> Creates email account via cosmical.me API
+       │   └─> Configures on mail.cosmical.me
+       └─> Returns account credentials
+   ```
+
+2. **Email Delivery Flow**:
+   ```
+   Outgoing Email
+   └─> SMTP (mail.cosmical.me)
+       ├─> DKIM signing
+       ├─> SPF verification
+       └─> DMARC policy check
+   ```
+
+#### 3. Security Measures
+
+- **API Security**:
+  - SSL/TLS encryption for all endpoints
+  - Rate limiting on account creation
+  - IP-based access controls
+  - Request logging and monitoring
+
+- **Email Security**:
+  - Secure password generation
+  - Forward-to address validation
+  - Quota enforcement
+  - Development environment isolation
+
+#### 4. Development Considerations
+
+- **Environment Separation**:
+  - Development accounts prefixed with `dev-`
+  - Reduced quotas in development
+  - Full logging in development mode
+  - Separate configuration for testing
+
+- **Configuration Management**:
+  - Environment variables for sensitive data
+  - Separate SMTP and API configurations
+  - Development-specific settings
+  - Logging level controls
 
 ### User Registration Flow
 

@@ -1,76 +1,99 @@
 <template>
-  <AuthLayout v-slot="{ isDark }">
-    <div class="p-6 md:p-8">
-      <h2 class="text-2xl font-bold mb-6 transition-colors duration-300"
-        :class="isDark ? 'text-cyber-primary' : 'text-cosmic-primary'">
-        Set New Password
+  <AuthLayout>
+    <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+      <!-- Logo Section -->
+      <div class="flex justify-center mb-6">
+        <router-link :to="{ name: 'home' }" class="inline-block w-20 h-20">
+          <CosmicLogo :isDark="false" />
+        </router-link>
+      </div>
+
+      <h2 class="text-2xl font-bold mb-2 text-center text-gray-900">
+        Reset Your Password
       </h2>
       
-      <div v-if="success" class="mb-6 p-4 rounded bg-green-100 text-green-700">
-        {{ success }}
+      <p class="text-gray-600 text-center mb-6">
+        Please enter your new password below.
+      </p>
+
+      <div v-if="successMessage" class="mb-6 p-4 bg-green-50 border border-green-200 text-green-600 rounded-md">
+        {{ successMessage }}
+        <div class="mt-4 text-center">
+          <router-link :to="{ name: 'login' }" class="font-medium text-blue-600 hover:text-blue-500">
+            Back to login
+          </router-link>
+        </div>
       </div>
-      
-      <Form @submit="handleSubmit" :validation-schema="schema" v-slot="{ errors, isSubmitting }">
+
+      <Form v-else :validation-schema="validationSchema" @submit="handleSubmit" v-slot="{ errors, isSubmitting }">
         <div class="space-y-4">
-          <!-- Password -->
+          <!-- New Password -->
           <div>
-            <label class="block text-sm font-medium mb-1 transition-colors duration-300"
-              :class="isDark ? 'text-gray-300' : 'text-cosmic-text'">
+            <label for="password" class="block text-sm font-medium mb-1 text-gray-700">
               New Password
             </label>
-            <Field name="password" type="password"
-              class="w-full px-4 py-2 rounded border bg-transparent transition-colors duration-300 focus:outline-none focus:ring-2"
-              :class="[
-                errors.password ? 'border-red-500' : isDark ? 'border-cyber-primary/30' : 'border-cosmic-primary/30',
-                isDark ? 'focus:ring-cyber-primary/50' : 'focus:ring-cosmic-primary/50',
-                isDark ? 'text-white' : 'text-cosmic-text'
-              ]"
-              placeholder="Enter your new password" />
+            <div class="relative">
+              <Field :type="showPassword ? 'text' : 'password'" id="password" name="password"
+                class="w-full px-4 py-2 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                placeholder="Enter your new password" />
+              <button type="button" @click="showPassword = !showPassword"
+                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-500">
+                <EyeIcon v-if="!showPassword" class="h-5 w-5" />
+                <EyeSlashIcon v-else class="h-5 w-5" />
+              </button>
+            </div>
             <ErrorMessage name="password" class="mt-1 text-sm text-red-500" />
           </div>
 
           <!-- Confirm Password -->
           <div>
-            <label class="block text-sm font-medium mb-1 transition-colors duration-300"
-              :class="isDark ? 'text-gray-300' : 'text-cosmic-text'">
+            <label for="confirmPassword" class="block text-sm font-medium mb-1 text-gray-700">
               Confirm Password
             </label>
-            <Field name="confirmPassword" type="password"
-              class="w-full px-4 py-2 rounded border bg-transparent transition-colors duration-300 focus:outline-none focus:ring-2"
-              :class="[
-                errors.confirmPassword ? 'border-red-500' : isDark ? 'border-cyber-primary/30' : 'border-cosmic-primary/30',
-                isDark ? 'focus:ring-cyber-primary/50' : 'focus:ring-cosmic-primary/50',
-                isDark ? 'text-white' : 'text-cosmic-text'
-              ]"
-              placeholder="Confirm your new password" />
+            <div class="relative">
+              <Field :type="showConfirmPassword ? 'text' : 'password'" id="confirmPassword" name="confirmPassword"
+                class="w-full px-4 py-2 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                placeholder="Confirm your new password" />
+              <button type="button" @click="showConfirmPassword = !showConfirmPassword"
+                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-500">
+                <EyeIcon v-if="!showConfirmPassword" class="h-5 w-5" />
+                <EyeSlashIcon v-else class="h-5 w-5" />
+              </button>
+            </div>
             <ErrorMessage name="confirmPassword" class="mt-1 text-sm text-red-500" />
           </div>
 
+          <!-- Password Requirements -->
+          <div class="text-sm text-gray-600 space-y-1">
+            <p class="font-medium">Password must contain:</p>
+            <ul class="list-disc list-inside space-y-1">
+              <li>At least 8 characters</li>
+              <li>At least one uppercase letter</li>
+              <li>At least one lowercase letter</li>
+              <li>At least one number</li>
+              <li>At least one special character</li>
+            </ul>
+          </div>
+
+          <!-- Error Alert -->
+          <div v-if="error" class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded relative" role="alert">
+            <span class="block sm:inline">{{ error }}</span>
+          </div>
+
           <!-- Submit Button -->
-          <button type="submit"
-            class="w-full py-2 px-4 rounded font-medium transition-colors duration-300 disabled:opacity-50"
-            :class="isDark ? 'bg-cyber-primary hover:bg-cyber-primary/80' : 'bg-cosmic-primary hover:bg-cosmic-primary/80'"
-            :disabled="isSubmitting">
-            <span v-if="isSubmitting">Resetting password...</span>
+          <button type="submit" :disabled="isSubmitting"
+            class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
+            <span v-if="isSubmitting">
+              <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Resetting...
+            </span>
             <span v-else>Reset Password</span>
           </button>
-
-          <!-- Error Message -->
-          <p v-if="error" class="text-red-500 text-sm text-center mt-4">{{ error }}</p>
         </div>
       </Form>
-
-      <div class="mt-6 text-center">
-        <p class="text-sm transition-colors duration-300"
-          :class="isDark ? 'text-gray-400' : 'text-cosmic-text/80'">
-          Remember your password?
-          <router-link :to="{ name: 'login' }"
-            class="font-medium transition-colors duration-300"
-            :class="isDark ? 'text-cyber-primary hover:text-cyber-primary/80' : 'text-cosmic-primary hover:text-cosmic-primary/80'">
-            Back to Login
-          </router-link>
-        </p>
-      </div>
     </div>
   </AuthLayout>
 </template>
@@ -78,19 +101,23 @@
 <script setup>
 import { ref } from 'vue'
 import { Form, Field, ErrorMessage } from 'vee-validate'
-import { z } from 'zod'
 import { useRouter, useRoute } from 'vue-router'
-import { useAuthStore } from '../../stores/auth'
-import AuthLayout from '../../layouts/AuthLayout.vue'
+import { useAuthStore } from '@/stores/auth'
+import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
+import AuthLayout from '@/layouts/AuthLayout.vue'
+import CosmicLogo from '@/components/CosmicLogo.vue'
+import * as z from 'zod'
 import { toFormValidator } from '@vee-validate/zod'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-const error = ref(null)
-const success = ref(null)
+const error = ref('')
+const successMessage = ref('')
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
 
-const schema = toFormValidator(
+const validationSchema = toFormValidator(
   z.object({
     password: z.string()
       .min(8, 'Password must be at least 8 characters')
@@ -106,20 +133,27 @@ const schema = toFormValidator(
   })
 )
 
-async function handleSubmit(values) {
+const handleSubmit = async (values) => {
   try {
-    error.value = null
-    success.value = null
-    await authStore.resetPassword({
-      token: route.params.token,
+    error.value = ''
+    const token = route.query.token
+    if (!token) {
+      error.value = 'Reset token is missing'
+      return
+    }
+
+    const response = await authStore.resetPassword({
+      token,
       password: values.password
     })
-    success.value = 'Password reset successful'
-    setTimeout(() => {
-      router.push({ name: 'login' })
-    }, 2000)
+
+    if (response.status === 'success') {
+      successMessage.value = 'Your password has been reset successfully. You can now login with your new password.'
+    } else {
+      error.value = response.message || 'Failed to reset password'
+    }
   } catch (err) {
-    error.value = err.message || 'Failed to reset password'
+    error.value = err.response?.data?.message || 'Failed to reset password'
   }
 }
 </script>

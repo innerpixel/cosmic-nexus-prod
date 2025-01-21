@@ -15,6 +15,7 @@
     "test:all:coverage": "npm run test:backend:coverage && npm run test:coverage"
   },
   "dependencies": {
+    "@heroicons/vue": "^2.2.0",
     "@vee-validate/rules": "^4.15.0",
     "@vee-validate/zod": "^4.15.0",
     "@vueuse/core": "^10.7.0",
@@ -34,7 +35,7 @@
     "jsdom": "^23.0.1",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
-    "vite": "^5.0.8",
+    "vite": "^4.5.1",
     "vitest": "^1.0.4"
   }
 }

@@ -1,51 +1,59 @@
 import nodemailer from 'nodemailer';
+import { mailConfig } from '../config/mail.config.js';
 
 class NotificationService {
   constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
+    console.log('Initializing email configuration with:', {
+      host: mailConfig.smtp.host,
+      port: mailConfig.smtp.port,
+      user: mailConfig.smtp.auth.user,
+      from: mailConfig.from
+    });
+
+    this.transporter = nodemailer.createTransport(mailConfig.smtp);
+
+    // Verify connection configuration
+    this.transporter.verify((error, success) => {
+      if (error) {
+        console.error('Email configuration error:', error);
+      } else {
+        console.log('Mail server is ready to take messages');
       }
     });
   }
 
-  async sendVerificationEmail(email, token) {
+  async sendVerificationEmail({ to, token }) {
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
     
     const mailOptions = {
-      from: process.env.EMAIL_FROM,
-      to: email,
-      subject: 'Verify Your CSMCL-SPACE Email',
+      from: mailConfig.from,
+      to: to,
+      subject: 'Verify Your Email - Cosmic Nexus',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #6366f1;">Welcome to CSMCL-SPACE!</h2>
-          <p>Thank you for joining our cosmic community. To complete your registration, please verify your email address.</p>
-          <div style="margin: 30px 0;">
+          <h2>Welcome to Cosmic Nexus!</h2>
+          <p>Thank you for registering. Please verify your email address by clicking the button below:</p>
+          <div style="text-align: center; margin: 30px 0;">
             <a href="${verificationUrl}" 
-               style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px;">
-              Verify Email Address
+               style="background-color: #4CAF50; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px;">
+              Verify Email
             </a>
           </div>
           <p>Or copy and paste this link in your browser:</p>
-          <p style="color: #4f46e5;">${verificationUrl}</p>
-          <p>This verification link will expire in ${process.env.EMAIL_TOKEN_EXPIRY}.</p>
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-          <p style="color: #6b7280; font-size: 0.875rem;">
-            If you didn't create an account with CSMCL-SPACE, you can safely ignore this email.
-          </p>
+          <p>${verificationUrl}</p>
+          <p>This link will expire in 24 hours.</p>
+          <p>If you did not create an account, please ignore this email.</p>
         </div>
       `
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('Verification email sent:', info.messageId);
+      return info;
     } catch (error) {
       console.error('Error sending verification email:', error);
-      throw new Error('Failed to send verification email');
+      throw error;
     }
   }
 
@@ -53,62 +61,62 @@ class NotificationService {
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
     
     const mailOptions = {
-      from: process.env.EMAIL_FROM,
+      from: mailConfig.from,
       to: email,
-      subject: 'Reset Your CSMCL-SPACE Password',
+      subject: 'Reset Your Password - Cosmic Nexus',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #6366f1;">Password Reset Request</h2>
-          <p>We received a request to reset your CSMCL-SPACE password. Click the button below to choose a new password.</p>
-          <div style="margin: 30px 0;">
+          <h2>Password Reset Request</h2>
+          <p>You requested to reset your password. Click the button below to proceed:</p>
+          <div style="text-align: center; margin: 30px 0;">
             <a href="${resetUrl}" 
-               style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px;">
+               style="background-color: #4CAF50; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px;">
               Reset Password
             </a>
           </div>
           <p>Or copy and paste this link in your browser:</p>
-          <p style="color: #4f46e5;">${resetUrl}</p>
-          <p>This password reset link will expire in ${process.env.EMAIL_TOKEN_EXPIRY}.</p>
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-          <p style="color: #6b7280; font-size: 0.875rem;">
-            If you didn't request a password reset, you can safely ignore this email.
-          </p>
+          <p>${resetUrl}</p>
+          <p>This link will expire in 1 hour.</p>
+          <p>If you did not request a password reset, please ignore this email.</p>
         </div>
       `
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('Password reset email sent:', info.messageId);
+      return info;
     } catch (error) {
       console.error('Error sending password reset email:', error);
-      throw new Error('Failed to send password reset email');
+      throw error;
     }
   }
 
   async sendWelcomeEmail(email, displayName) {
+    console.log('Attempting to send welcome email to:', email);
     const mailOptions = {
-      from: process.env.EMAIL_FROM,
+      from: mailConfig.from,
       to: email,
-      subject: 'Welcome to CSMCL-SPACE!',
+      subject: 'Welcome to Cosmic Nexus!',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #6366f1;">Welcome to Your Cosmic Journey, ${displayName}!</h2>
-          <p>Thank you for joining CSMCL-SPACE. Your account has been successfully created and verified.</p>
+          <h2>Welcome to Your Cosmic Journey, ${displayName}!</h2>
+          <p>Thank you for joining Cosmic Nexus. Your account has been successfully created and verified.</p>
           <p>Here's what you get with your new account:</p>
           <ul style="list-style: none; padding: 0;">
             <li style="margin: 10px 0; padding-left: 24px; position: relative;">
-              ✨ Your unique @cosmical.me email address
+              Your unique @cosmical.me email address
             </li>
             <li style="margin: 10px 0; padding-left: 24px; position: relative;">
-              💎 10,000,000 CSMCL tokens
+              10,000,000 CSMCL tokens
             </li>
             <li style="margin: 10px 0; padding-left: 24px; position: relative;">
-              🎨 Exclusive NFT minting capability
+              Exclusive NFT minting capability
             </li>
           </ul>
           <div style="margin: 30px 0;">
             <a href="${process.env.FRONTEND_URL}/dashboard" 
-               style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px;">
+               style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px;">
               Visit Your Dashboard
             </a>
           </div>
@@ -121,10 +129,17 @@ class NotificationService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      console.log('Sending email with options:', {
+        from: mailOptions.from,
+        to: mailOptions.to,
+        subject: mailOptions.subject
+      });
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('Welcome email sent:', info.messageId);
+      return info;
     } catch (error) {
       console.error('Error sending welcome email:', error);
-      throw new Error('Failed to send welcome email');
+      throw error;
     }
   }
 }

@@ -1,187 +1,226 @@
 import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
 import axios from 'axios'
 
-const API_URL = 'http://localhost:3000/api'
+const API_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api'  // Using Vite's proxy configuration
 
-export const useAuthStore = defineStore('auth', {
-  state: () => ({
-    user: null,
-    accessToken: localStorage.getItem('accessToken'),
-    refreshToken: localStorage.getItem('refreshToken'),
-    loading: false,
-    error: null
-  }),
+export const useAuthStore = defineStore('auth', () => {
+  const user = ref(null)
+  const accessToken = ref(localStorage.getItem('accessToken'))
+  const refreshToken = ref(localStorage.getItem('refreshToken'))
+  const loading = ref(false)
 
-  getters: {
-    isAuthenticated: (state) => !!state.accessToken,
-    isVerified: (state) => state.user?.isEmailVerified && state.user?.isPhoneVerified,
-    tokenBalance: (state) => state.user?.tokenBalance || 0,
-    hasNFT: (state) => state.user?.nftMinted || false
-  },
+  // Computed properties
+  const isAuthenticated = computed(() => !!user.value && !!accessToken.value)
+  const isEmailVerified = computed(() => user.value?.isEmailVerified ?? false)
+  const isSimVerified = computed(() => user.value?.isSimVerified ?? false)
+  const hasMailAccount = computed(() => user.value?.mailAccountCreated ?? false)
+  const hasHomeDir = computed(() => user.value?.homeDirCreated ?? false)
+  const tokenBalance = computed(() => user.value?.tokenBalance || 0)
+  const hasNFT = computed(() => user.value?.nftMinted || false)
 
-  actions: {
-    async register(userData) {
-      this.loading = true
-      this.error = null
-      try {
-        const response = await axios.post(`${API_URL}/auth/register`, userData)
-        return response.data
-      } catch (error) {
-        this.error = error.response?.data?.message || 'Registration failed'
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
+  // Initialize auth state from localStorage
+  const initializeAuth = () => {
+    const storedUser = localStorage.getItem('user')
+    const storedToken = localStorage.getItem('accessToken')
+    
+    if (storedUser && storedToken) {
+      user.value = JSON.parse(storedUser)
+      accessToken.value = storedToken
+      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
+    }
+  }
 
-    async login({ email, password }) {
-      this.loading = true
-      this.error = null
-      try {
-        const response = await axios.post(`${API_URL}/auth/login`, { email, password })
-        const { user, tokens } = response.data.data
+  // Login
+  const login = async ({ email, password, remember }) => {
+    try {
+      loading.value = true
+      const response = await axios.post(`${API_URL}/auth/login`, { email, password })
+      
+      if (response.data.status === 'success') {
+        user.value = response.data.data.user
+        accessToken.value = response.data.data.accessToken
+        refreshToken.value = response.data.data.refreshToken
         
-        this.user = user
-        this.accessToken = tokens.accessToken
-        this.refreshToken = tokens.refreshToken
+        // Set axios default authorization header
+        axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken.value}`
         
-        // Set auth header for future requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`
-        
-        // Store tokens in localStorage
-        localStorage.setItem('accessToken', tokens.accessToken)
-        localStorage.setItem('refreshToken', tokens.refreshToken)
-        
-        return response.data
-      } catch (error) {
-        this.error = error.response?.data?.message || 'Login failed'
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async verifyEmail(token) {
-      this.loading = true
-      this.error = null
-      try {
-        const response = await axios.post(`${API_URL}/auth/verify-email/${token}`)
-        if (this.user) {
-          this.user.isEmailVerified = true
+        // Store in localStorage if remember is true
+        if (remember) {
+          localStorage.setItem('user', JSON.stringify(user.value))
+          localStorage.setItem('accessToken', accessToken.value)
+          localStorage.setItem('refreshToken', refreshToken.value)
         }
-        return response.data
-      } catch (error) {
-        this.error = error.response?.data?.message || 'Email verification failed'
-        throw error
-      } finally {
-        this.loading = false
       }
-    },
+      
+      return response.data
+    } finally {
+      loading.value = false
+    }
+  }
 
-    async verifyPhone(code) {
-      this.loading = true
-      this.error = null
-      try {
-        const response = await axios.post(`${API_URL}/auth/verify-phone`, {
-          phone: this.user.phone,
-          code
-        })
-        if (this.user) {
-          this.user.isPhoneVerified = true
-          if (response.data.data?.tokenBalance) {
-            this.user.tokenBalance = response.data.data.tokenBalance
-          }
-        }
-        return response.data
-      } catch (error) {
-        this.error = error.response?.data?.message || 'Phone verification failed'
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async refreshTokens() {
-      try {
-        const refreshToken = localStorage.getItem('refreshToken')
-        if (!refreshToken) {
-          throw new Error('No refresh token available')
-        }
-
-        const response = await axios.post(`${API_URL}/auth/refresh-token`, { refreshToken })
-        const { tokens } = response.data.data
-
-        this.accessToken = tokens.accessToken
-        this.refreshToken = tokens.refreshToken
-
-        // Update auth header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`
-        
-        // Update stored refresh token
-        localStorage.setItem('accessToken', tokens.accessToken)
-        localStorage.setItem('refreshToken', tokens.refreshToken)
-
-        return tokens
-      } catch (error) {
-        // If refresh fails, logout user
-        await this.logout()
-        throw error
-      }
-    },
-
-    async forgotPassword(email) {
-      this.loading = true
-      this.error = null
-      try {
-        const response = await axios.post(`${API_URL}/auth/forgot-password`, { email })
-        return response.data
-      } catch (error) {
-        this.error = error.response?.data?.message || 'Failed to send reset instructions'
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async resetPassword({ token, password }) {
-      this.loading = true
-      this.error = null
-      try {
-        const response = await axios.post(`${API_URL}/auth/reset-password`, { token, password })
-        return response.data
-      } catch (error) {
-        this.error = error.response?.data?.message || 'Password reset failed'
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async logout() {
-      // Clear state
-      this.user = null
-      this.accessToken = null
-      this.refreshToken = null
-      this.error = null
-
-      // Clear stored tokens
+  // Logout
+  const logout = async () => {
+    try {
+      loading.value = true
+      await axios.post(`${API_URL}/auth/logout`)
+    } finally {
+      // Clear state regardless of API call success
+      user.value = null
+      accessToken.value = null
+      refreshToken.value = null
+      delete axios.defaults.headers.common['Authorization']
+      localStorage.removeItem('user')
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
-      
-      // Clear auth header
-      delete axios.defaults.headers.common['Authorization']
-    },
+      loading.value = false
+    }
+  }
 
-    // Initialize auth state from stored tokens
-    async init() {
-      const refreshToken = localStorage.getItem('refreshToken')
-      if (refreshToken) {
-        try {
-          await this.refreshTokens()
-        } catch (error) {
-          console.error('Failed to refresh tokens:', error)
+  // Refresh token
+  const refreshTokens = async () => {
+    try {
+      const response = await axios.post(`${API_URL}/auth/refresh-token`, { refreshToken: refreshToken.value })
+      if (response.data.status === 'success') {
+        accessToken.value = response.data.data.accessToken
+        refreshToken.value = response.data.data.refreshToken
+        axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken.value}`
+        
+        if (localStorage.getItem('accessToken')) {
+          localStorage.setItem('accessToken', accessToken.value)
+          localStorage.setItem('refreshToken', refreshToken.value)
         }
       }
+      return true
+    } catch (error) {
+      // If refresh fails, log out
+      await logout()
+      return false
     }
+  }
+
+  // Update user profile
+  const updateProfile = async (updates) => {
+    try {
+      loading.value = true
+      const response = await axios.patch(`${API_URL}/users/profile`, updates)
+      if (response.data.status === 'success') {
+        user.value = { ...user.value, ...response.data.data.user }
+        if (localStorage.getItem('user')) {
+          localStorage.setItem('user', JSON.stringify(user.value))
+        }
+      }
+      return response.data
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Register
+  const register = async (userData) => {
+    try {
+      loading.value = true
+      const response = await axios.post(`${API_URL}/auth/register`, userData)
+      return response.data
+    } catch (error) {
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Verify Email
+  const verifyEmail = async (token) => {
+    try {
+      loading.value = true
+      const response = await axios.post(`${API_URL}/auth/verify-email/${token}`)
+      if (this.user) {
+        this.user.isEmailVerified = true
+      }
+      return response.data
+    } catch (error) {
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Verify Phone
+  const verifyPhone = async (code) => {
+    try {
+      loading.value = true
+      const response = await axios.post(`${API_URL}/auth/verify-phone`, {
+        phone: this.user.phone,
+        code
+      })
+      if (this.user) {
+        this.user.isPhoneVerified = true
+        if (response.data.data?.tokenBalance) {
+          this.user.tokenBalance = response.data.data.tokenBalance
+        }
+      }
+      return response.data
+    } catch (error) {
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Forgot Password
+  const forgotPassword = async (email) => {
+    try {
+      loading.value = true
+      const response = await axios.post(`${API_URL}/auth/forgot-password`, { email })
+      return response.data
+    } catch (error) {
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Reset Password
+  const resetPassword = async ({ token, password }) => {
+    try {
+      loading.value = true
+      const response = await axios.post(`${API_URL}/auth/reset-password`, { token, password })
+      return response.data
+    } catch (error) {
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Initialize on store creation
+  initializeAuth()
+
+  return {
+    // State
+    user,
+    accessToken,
+    refreshToken,
+    loading,
+    
+    // Computed
+    isAuthenticated,
+    isEmailVerified,
+    isSimVerified,
+    hasMailAccount,
+    hasHomeDir,
+    tokenBalance,
+    hasNFT,
+    
+    // Actions
+    login,
+    logout,
+    refreshTokens,
+    updateProfile,
+    register,
+    verifyEmail,
+    verifyPhone,
+    forgotPassword,
+    resetPassword
   }
 })
