@@ -17,6 +17,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -25,37 +31,37 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           debug: true
           script: |
-            set -e
             echo "Starting deployment at $(date)"
             
-            echo "Checking directory structure..."
+            # Navigate to project directory
             cd /var/www/csmcl.space
-            ls -la
             
-            # Create backend directory if it doesn't exist
-            if [ ! -d "backend" ]; then
-              echo "Creating backend directory..."
-              mkdir -p backend
-            fi
-            
-            echo "Git status:"
-            git status
+            # Pull latest changes
             git pull origin main
             
-            echo "Building frontend..."
+            # Frontend deployment
+            echo "Deploying frontend..."
             cd frontend
             npm ci
             npm run build
             
-            echo "Setting up backend..."
+            # Backend deployment
+            echo "Deploying backend..."
             cd ../backend
-            if [ ! -f "package.json" ]; then
-              echo "Initializing backend package.json..."
-              npm init -y
-            fi
             npm ci
             
+            # Restart service
             echo "Restarting service..."
             sudo systemctl restart csmcl-space
             
-            echo "Deployment completed at $(date)"
+            # Verify service status
+            echo "Service status:"
+            sudo systemctl status csmcl-space --no-pager
+            
+            # Check if service is running
+            if ! systemctl is-active --quiet csmcl-space; then
+              echo "Service failed to start"
+              exit 1
+            fi
+            
+            echo "Deployment completed successfully at $(date)"
