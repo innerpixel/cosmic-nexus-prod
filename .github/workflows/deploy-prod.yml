@@ -23,28 +23,30 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install SSH key
+      - name: Install SSH Key
         run: |
           mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          # Write key with proper line endings
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          # Debug key format (safely)
-          ssh-keygen -l -f ~/.ssh/deploy_key || echo "Invalid key format"
-          # Add host key
-          ssh-keyscan -t ed25519 csmcl.space >> ~/.ssh/known_hosts
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/id_ed25519.pub
+          chmod 600 ~/.ssh/id_ed25519
+          chmod 644 ~/.ssh/id_ed25519.pub
+          ssh-keyscan -H csmcl.space >> ~/.ssh/known_hosts
+          # Debug: Check key permissions and content
+          ls -la ~/.ssh/
+          ssh-keygen -l -f ~/.ssh/id_ed25519 || echo "Invalid key format"
 
       - name: Deploy to VPS
-        run: |
-          echo "Starting deployment at $(date)"
-          
-          # Test SSH connection with verbose output
-          ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no root@csmcl.space '
-            set -e
-            cd /var/www/csmcl.space || exit 1
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: csmcl.space
+          username: root
+          key_path: ~/.ssh/id_ed25519
+          debug: true
+          script: |
+            echo "Starting deployment at $(date)"
             
-            echo "Pulling latest changes..."
+            echo "Updating repository..."
+            cd /var/www/csmcl.space
             git pull origin main
             
             echo "Building frontend..."
@@ -61,4 +63,5 @@ jobs:
             
             echo "Checking service status..."
             sudo systemctl status csmcl-space --no-pager
-          '
+            
+            echo "Deployment completed at $(date)"
