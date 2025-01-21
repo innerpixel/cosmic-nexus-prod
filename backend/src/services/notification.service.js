@@ -6,8 +6,7 @@ class NotificationService {
     console.log('Initializing email configuration with:', {
       host: mailConfig.smtp.host,
       port: mailConfig.smtp.port,
-      user: mailConfig.smtp.auth.user,
-      from: mailConfig.from
+      from: process.env.MAIL_FROM
     });
 
     this.transporter = nodemailer.createTransport(mailConfig.smtp);
@@ -26,7 +25,7 @@ class NotificationService {
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
     
     const mailOptions = {
-      from: mailConfig.from,
+      from: process.env.MAIL_FROM,
       to: to,
       subject: 'Verify Your Email - Cosmic Nexus',
       html: `
@@ -61,7 +60,7 @@ class NotificationService {
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
     
     const mailOptions = {
-      from: mailConfig.from,
+      from: process.env.MAIL_FROM,
       to: email,
       subject: 'Reset Your Password - Cosmic Nexus',
       html: `
@@ -95,7 +94,7 @@ class NotificationService {
   async sendWelcomeEmail(email, displayName) {
     console.log('Attempting to send welcome email to:', email);
     const mailOptions = {
-      from: mailConfig.from,
+      from: process.env.MAIL_FROM,
       to: email,
       subject: 'Welcome to Cosmic Nexus!',
       html: `

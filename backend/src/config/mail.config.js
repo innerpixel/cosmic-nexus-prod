@@ -1,22 +1,18 @@
 export const mailConfig = {
-  // SMTP Configuration for cosmical.me (mail server)
+  // SMTP Configuration for mail.cosmical.me
   smtp: {
-    host: process.env.MAIL_HOST,  // Uses dev.cosmical.me or cosmical.me based on environment
-    port: parseInt(process.env.MAIL_PORT) || 587,
-    secure: false,             // Use STARTTLS
+    host: 'mail.cosmical.me',
+    port: 25,
+    secure: false,
     auth: {
       user: process.env.MAIL_USER,
       pass: process.env.MAIL_PASSWORD
     },
+    tls: {
+      rejectUnauthorized: false
+    },
     debug: process.env.NODE_ENV === 'development',
     logger: process.env.NODE_ENV === 'development'
-  },
-
-  // Account Management API
-  api: {
-    endpoint: process.env.MAIL_API_ENDPOINT,
-    adminUser: process.env.MAIL_ADMIN_USER,
-    adminPassword: process.env.MAIL_ADMIN_PASSWORD
   },
 
   // Mail domain configuration
@@ -26,7 +22,6 @@ export const mailConfig = {
   development: {
     prefix: process.env.DEV_PREFIX || 'dev-',
     quotaMB: parseInt(process.env.DEV_QUOTA_MB) || 100,
-    // In development, we'll use ethereal.email for testing
     useTestAccount: process.env.NODE_ENV === 'development'
   }
 };
