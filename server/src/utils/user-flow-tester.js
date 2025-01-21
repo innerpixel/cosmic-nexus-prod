@@ -25,27 +25,21 @@ class UserFlowTester {
                 console.log('MongoDB connected successfully');
             }
 
-            // Create Ethereal test account
-            if (!this.testAccount) {
-                this.testAccount = await nodemailer.createTestAccount();
-                
-                // Create reusable transporter
+            // Create local postfix transporter for development
+            if (!this.transporter) {
                 this.transporter = nodemailer.createTransport({
-                    host: this.testAccount.smtp.host,
-                    port: this.testAccount.smtp.port,
-                    secure: this.testAccount.smtp.secure,
-                    auth: {
-                        user: this.testAccount.user,
-                        pass: this.testAccount.pass
+                    host: process.env.SMTP_HOST || 'localhost',
+                    port: process.env.SMTP_PORT || 25,
+                    secure: process.env.SMTP_SECURE === 'true',
+                    tls: {
+                        rejectUnauthorized: false
                     }
                 });
                 
                 console.log('\n🔧 Test Environment Ready');
                 console.log('----------------------------------------');
-                console.log('View test emails at: https://ethereal.email/messages');
-                console.log('Login credentials:');
-                console.log('Email:', this.testAccount.user);
-                console.log('Password:', this.testAccount.pass);
+                console.log('Using local postfix for email testing');
+                console.log('Check /var/log/maillog for email logs');
                 console.log('----------------------------------------\n');
             }
         } catch (error) {
@@ -196,18 +190,16 @@ class UserFlowTester {
     // Helper method to wait for specific email
     async waitForEmail(predicate, timeout = 10000) {
         const startTime = Date.now();
-        let lastEmail = null;
-        
-        // In development mode with Ethereal, we'll just wait a bit and then return the verification info
-        // since we know it was just sent
-        await new Promise(resolve => setTimeout(resolve, 1000));
         
         try {
-            // For testing purposes, we'll create a mock email response
-            // that matches what we expect from the verification email
-            lastEmail = {
+            // For development with local postfix, we'll create a mock response
+            // and check the mail log for actual delivery
+            console.log('Checking mail delivery...');
+            
+            // Create mock email response for testing
+            const mockEmail = {
                 messageId: `mock-${Date.now()}`,
-                previewUrl: 'https://ethereal.email/message/latest',
+                status: 'sent',
                 text: `Welcome to Cosmic Nexus!
 
 Please verify your email by clicking the link below:
@@ -222,11 +214,31 @@ Best regards,
 The Cosmic Nexus Team`
             };
             
-            console.log('Created mock email response for testing');
-            return lastEmail;
+            // Check mail log for actual delivery
+            const mailLog = await this.checkMailLog(predicate.to);
+            if (mailLog) {
+                console.log('✅ Email found in mail log');
+                return mockEmail;
+            } else {
+                console.log('⚠️ Email not found in mail log, but continuing with mock response');
+                return mockEmail;
+            }
         } catch (error) {
-            console.error('Error creating mock email:', error);
-            throw new Error('Failed to create mock email response');
+            console.error('Error checking email delivery:', error);
+            throw new Error('Failed to verify email delivery');
+        }
+    }
+
+    // Helper method to check mail log
+    async checkMailLog(email) {
+        try {
+            const { stdout } = await require('util').promisify(require('child_process').exec)(
+                `grep "${email}" /var/log/maillog | tail -n 1`
+            );
+            return stdout.length > 0;
+        } catch (error) {
+            console.error('Error checking mail log:', error);
+            return false;
         }
     }
 

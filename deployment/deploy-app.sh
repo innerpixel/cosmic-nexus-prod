@@ -25,32 +25,29 @@ else
     exit 1
 fi
 
-# Update and restart backend
+# Copy dist to web server directory
+echo -e "${BLUE}Copying files to web server...${NC}"
+sudo cp -r dist/* /var/www/local.csmcl-space/dist/
+
+# Update and start backend
 echo -e "${BLUE}Updating backend...${NC}"
 cd $SERVER_DIR
 npm install
 
-# Check if pm2 is running our app
-if pm2 list | grep -q "cosmic-nexus"; then
-    echo -e "${BLUE}Restarting existing service...${NC}"
-    pm2 restart cosmic-nexus
-else
-    echo -e "${BLUE}Starting new service...${NC}"
-    pm2 start src/index.js --name cosmic-nexus
-fi
+# Kill any existing node processes
+pkill -f "node.*src/index.js" || true
+
+# Start the server in the background
+echo -e "${BLUE}Starting server...${NC}"
+NODE_ENV=development nohup node src/index.js > /var/log/cosmic-nexus.log 2>&1 &
 
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}Backend update successful${NC}"
+    echo -e "${GREEN}Backend started successfully${NC}"
+    echo -e "${BLUE}Server logs available at: /var/log/cosmic-nexus.log${NC}"
 else
-    echo "Backend update failed"
+    echo "Backend start failed"
     exit 1
 fi
 
-# Save PM2 configuration
-pm2 save
-
 echo -e "${GREEN}Deployment completed successfully!${NC}"
-echo -e "${BLUE}You can monitor the application using: pm2 monit${NC}"
-
-# Show current status
-pm2 status
+echo -e "${BLUE}Application is now running at: https://local-dev.test${NC}"
