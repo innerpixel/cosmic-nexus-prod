@@ -68,7 +68,7 @@ processManagement:
 ### 3. Application Directory Structure
 
 ```
-/var/www/cosmic-nexus/
+/var/www/csmcl.space/
 ├── frontend/           # Frontend application
 │   ├── dist/          # Built frontend files
 │   └── src/           # Source files
@@ -99,7 +99,7 @@ server {
     ssl_certificate_key /etc/nginx/ssl/local-dev.test.key;
 
     # Root directory
-    root /var/www/cosmic-nexus/frontend/dist;
+    root /var/www/csmcl.space/frontend/dist;
 
     # API Proxy
     location /api/ {
@@ -119,7 +119,7 @@ server {
 ```
 
 #### Production Setup
-Location: `/etc/nginx/sites-available/cosmic-nexus`
+Location: `/etc/nginx/sites-available/csmcl.space`
 ```nginx
 server {
     listen 80;
@@ -144,7 +144,7 @@ server {
 
     # Frontend
     location / {
-        root /var/www/cosmic-nexus/frontend/dist;
+        root /var/www/csmcl.space/frontend/dist;
         try_files $uri $uri/ /index.html;
         expires 1h;
         add_header Cache-Control "public, no-transform";
@@ -167,17 +167,17 @@ server {
 
 ### 5. Backend Service Configuration
 
-Location: `/etc/systemd/system/cosmic-nexus.service`
+Location: `/etc/systemd/system/csmcl-space.service`
 
 ```ini
 [Unit]
-Description=Cosmic Nexus Backend Service
+Description=CSMCL Space Backend Service
 After=network.target mongod.service
 
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/var/www/cosmic-nexus/backend
+WorkingDirectory=/var/www/csmcl.space/backend
 ExecStart=/usr/bin/node dist/index.js
 Restart=always
 Environment=NODE_ENV=production
@@ -220,23 +220,22 @@ VITE_API_URL=https://csmcl.space/api
 
 ### Initial VPS Setup
 
-1. **Create Deployment Directory**:
+1. **Verify Deployment Directory**:
    ```bash
-   sudo mkdir -p /var/www/cosmic-nexus
-   sudo chown -R www-data:www-data /var/www/cosmic-nexus
+   cd /var/www/csmcl.space
    ```
 
 2. **Setup Systemd Service**:
-   Create `/etc/systemd/system/cosmic-nexus.service`:
+   Create `/etc/systemd/system/csmcl-space.service`:
    ```ini
    [Unit]
-   Description=Cosmic Nexus Backend
+   Description=CSMCL Space Backend
    After=network.target
 
    [Service]
    Type=simple
    User=www-data
-   WorkingDirectory=/var/www/cosmic-nexus/backend
+   WorkingDirectory=/var/www/csmcl.space/backend
    ExecStart=/usr/bin/node src/index.js
    Restart=always
    Environment=NODE_ENV=production
@@ -247,14 +246,17 @@ VITE_API_URL=https://csmcl.space/api
 
 3. **Enable and Start Service**:
    ```bash
-   sudo systemctl enable cosmic-nexus
-   sudo systemctl start cosmic-nexus
+   sudo systemctl enable csmcl-space
+   sudo systemctl start csmcl-space
    ```
 
-4. **Clone Production Repository**:
+4. **Initialize Git Repository**:
    ```bash
-   cd /var/www
-   git clone git@github.com:innerpixel/cosmic-nexus-prod.git cosmic-nexus
+   cd /var/www/csmcl.space
+   git init
+   git remote add origin git@github.com:innerpixel/cosmic-nexus-prod.git
+   git fetch origin
+   git checkout main
    ```
 
 ### GitHub Actions Setup
@@ -286,30 +288,30 @@ VITE_API_URL=https://csmcl.space/api
              username: ${{ secrets.SSH_USERNAME }}
              key: ${{ secrets.SSH_PRIVATE_KEY }}
              script: |
-               cd /var/www/cosmic-nexus
+               cd /var/www/csmcl.space
                git pull origin main
                cd frontend
                npm install
                npm run build
                cd ../backend
                npm install
-               sudo systemctl restart cosmic-nexus
+               sudo systemctl restart csmcl-space
    ```
 
 ### Service Management
 
 1. **Monitor Service**:
    ```bash
-   sudo systemctl status cosmic-nexus
-   sudo journalctl -u cosmic-nexus -f
+   sudo systemctl status csmcl-space
+   sudo journalctl -u csmcl-space -f
    ```
 
 2. **Service Controls**:
    ```bash
-   sudo systemctl start cosmic-nexus    # Start service
-   sudo systemctl stop cosmic-nexus     # Stop service
-   sudo systemctl restart cosmic-nexus  # Restart service
-   sudo systemctl reload cosmic-nexus   # Reload configuration
+   sudo systemctl start csmcl-space    # Start service
+   sudo systemctl stop csmcl-space     # Stop service
+   sudo systemctl restart csmcl-space  # Restart service
+   sudo systemctl reload csmcl-space   # Reload configuration
    ```
 
 ### SSL Configuration
@@ -352,12 +354,12 @@ VITE_API_URL=https://csmcl.space/api
 
 If needed, roll back to previous version:
 ```bash
-cd /var/www/cosmic-nexus
+cd /var/www/csmcl.space
 git log --oneline  # Find commit to roll back to
 git reset --hard <commit-hash>
 cd frontend && npm install && npm run build
 cd ../backend && npm install
-sudo systemctl restart cosmic-nexus
+sudo systemctl restart csmcl-space
 ```
 
 ## Maintenance
@@ -365,10 +367,10 @@ sudo systemctl restart cosmic-nexus
 ### Service Management
 ```bash
 # Backend service
-sudo systemctl status cosmic-nexus
-sudo systemctl start cosmic-nexus
-sudo systemctl stop cosmic-nexus
-sudo systemctl restart cosmic-nexus
+sudo systemctl status csmcl-space
+sudo systemctl start csmcl-space
+sudo systemctl stop csmcl-space
+sudo systemctl restart csmcl-space
 
 # MongoDB
 sudo systemctl status mongod
@@ -380,7 +382,7 @@ sudo systemctl reload nginx
 ```
 
 ### Log Locations
-- Backend: `sudo journalctl -u cosmic-nexus`
+- Backend: `sudo journalctl -u csmcl-space`
 - MongoDB: `/var/log/mongodb/mongod.log`
 - Nginx: `/var/log/nginx/{access,error}.log`
 - Mail: `/var/log/mail.log`
@@ -393,7 +395,7 @@ mongodump --uri="mongodb://cosmicnexus:CosmicNexus2025!@localhost:27017/cosmic-n
 
 2. Application Backup
 ```bash
-tar -czf /backup/cosmic-nexus-$(date +%Y%m%d).tar.gz /var/www/cosmic-nexus
+tar -czf /backup/csmcl-space-$(date +%Y%m%d).tar.gz /var/www/csmcl.space
 ```
 
 ## Security Considerations
@@ -421,7 +423,7 @@ tar -czf /backup/cosmic-nexus-$(date +%Y%m%d).tar.gz /var/www/cosmic-nexus
 
 1. **Backend Service Won't Start**
    ```bash
-   sudo journalctl -u cosmic-nexus -n 50
+   sudo journalctl -u csmcl-space -n 50
    ```
 
 2. **MongoDB Connection Issues**
@@ -442,14 +444,14 @@ tar -czf /backup/cosmic-nexus-$(date +%Y%m%d).tar.gz /var/www/cosmic-nexus
 5. **Permission Issues**
    ```bash
    # Fix web directory permissions
-   sudo chown -R $USER:$USER /var/www/cosmic-nexus
+   sudo chown -R $USER:$USER /var/www/csmcl.space
 
    # Fix storage directory permissions
    sudo chown -R $USER:$USER storage/
    chmod -R 755 storage/
 
    # Fix log file permissions
-   sudo chown $USER:$USER /var/log/cosmic-nexus.log
+   sudo chown $USER:$USER /var/log/csmcl-space.log
    ```
 
 ### Health Checks
@@ -487,7 +489,7 @@ tar -czf /backup/cosmic-nexus-$(date +%Y%m%d).tar.gz /var/www/cosmic-nexus
 
 ## Directory Structure
 ```
-/var/www/cosmic-nexus/
+/var/www/csmcl.space/
 ├── frontend/           # Frontend application
 │   ├── dist/          # Built frontend files
 │   └── src/           # Source files
@@ -534,7 +536,7 @@ git remote add local /var/git/local.csmcl-space.git
 
 ### Deployment Hooks
 The post-receive hook in `/var/git/local.csmcl-space.git/hooks/post-receive` handles:
-1. Checkout of pushed code to `/var/www/cosmic-nexus/frontend`
+1. Checkout of pushed code to `/var/www/csmcl.space/frontend`
 2. Installation of frontend dependencies
 3. Building of frontend
 4. Copying and setting up backend
@@ -548,8 +550,8 @@ The post-receive hook in `/var/git/local.csmcl-space.git/hooks/post-receive` han
 sudo dnf install nginx mongodb-org postfix
 
 # Create directory structure
-sudo mkdir -p /var/www/cosmic-nexus/{frontend,backend}
-sudo chown -R $USER:$USER /var/www/cosmic-nexus
+sudo mkdir -p /var/www/csmcl.space/{frontend,backend}
+sudo chown -R $USER:$USER /var/www/csmcl.space
 
 # Start required services
 sudo systemctl enable --now nginx mongodb postfix
@@ -578,7 +580,7 @@ server {
     ssl_certificate_key /etc/nginx/ssl/local-dev.test.key;
 
     # Root directory
-    root /var/www/cosmic-nexus/frontend/dist;
+    root /var/www/csmcl.space/frontend/dist;
 
     # API Proxy
     location /api/ {
@@ -626,7 +628,7 @@ This script:
 ### 5. Monitoring
 - **Frontend**: Served at `https://local-dev.test`
 - **Backend**: Runs on port 5000
-- **Logs**: `/var/log/cosmic-nexus.log`
+- **Logs**: `/var/log/csmcl-space.log`
 - **Mail**: Check `/var/log/maillog` for email delivery
 
 ## Troubleshooting
@@ -636,14 +638,14 @@ This script:
 1. **Permission Issues**
 ```bash
 # Fix web directory permissions
-sudo chown -R $USER:$USER /var/www/cosmic-nexus
+sudo chown -R $USER:$USER /var/www/csmcl.space
 
 # Fix storage directory permissions
 sudo chown -R $USER:$USER storage/
 chmod -R 755 storage/
 
 # Fix log file permissions
-sudo chown $USER:$USER /var/log/cosmic-nexus.log
+sudo chown $USER:$USER /var/log/csmcl-space.log
 ```
 
 2. **Server Already Running**
@@ -665,7 +667,7 @@ sudo tail -f /var/log/mongodb/mongod.log
 
 ```bash
 # View application logs
-tail -f /var/log/cosmic-nexus.log
+tail -f /var/log/csmcl-space.log
 
 # Check nginx configuration
 sudo nginx -t
@@ -706,7 +708,7 @@ mongorestore --db cosmic-nexus /backup/YYYYMMDD/cosmic-nexus
 ### Application Backup
 ```bash
 # Backup application files
-tar -czf /backup/app_$(date +%Y%m%d).tar.gz /var/www/cosmic-nexus
+tar -czf /backup/app_$(date +%Y%m%d).tar.gz /var/www/csmcl.space
 ```
 
 ## Performance Monitoring
