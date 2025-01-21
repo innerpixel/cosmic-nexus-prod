@@ -3,10 +3,10 @@
 ## Environment Setup
 
 ### Local Development Environment
-- **Frontend**: `http://localhost:3000`
-- **Backend API**: `http://localhost:5000`
+- **Frontend**: `https://cosmic-nexus.local`
+- **Backend API**: `https://cosmic-nexus.local/api`
 - **Database**: `mongodb://localhost:27017/cosmic-nexus-dev`
-- **Mail Server**: `mail.dev.cosmical.me` (remote mail server)
+- **Mail Server**: `mail.cosmical.me` (remote mail server)
 
 ### VPS Production Environment
 - **Frontend**: `https://csmcl.space`
@@ -19,8 +19,8 @@
 ### Local Development
 When developing locally, you should:
 1. Use local MongoDB instance (`cosmic-nexus-dev` database)
-2. Run local API server on port 5000
-3. Run local frontend server on port 3000
+2. Access the site via `https://cosmic-nexus.local`
+3. API endpoints available at `https://cosmic-nexus.local/api`
 4. Connect to remote mail server for email functionality
 
 Benefits:
@@ -28,15 +28,44 @@ Benefits:
 - No risk of affecting production data
 - Faster development cycle
 - Works offline (except for email features)
+- HTTPS enabled with self-signed certificates
+- Similar configuration to production
 
 ### Production Environment
 Production environment uses:
 1. VPS MongoDB instance (`cosmic-nexus-prod` database)
 2. VPS API server
 3. Production frontend
-4. Same mail server as development
+4. Dedicated mail server (cosmical.me)
 
 Never connect to production database during development to prevent accidental data modifications.
+
+## Local Development Setup
+
+### Prerequisites
+- AlmaLinux (local development OS)
+- Node.js and npm
+- MongoDB
+- Nginx 1.26.2
+- Git
+
+### Local Domain Setup
+1. Add to `/etc/hosts`:
+   ```
+   127.0.0.1   cosmic-nexus.local
+   ```
+
+### Nginx Configuration
+- Configuration file: `/etc/nginx/conf.d/cosmic-nexus.conf`
+- SSL certificates: `/etc/nginx/ssl/nginx-selfsigned.{crt,key}`
+- Web root: `/var/www/cosmic-nexus`
+- Logs: `/var/log/nginx/cosmic-nexus-{access,error}.log`
+
+### Security Notes
+- Local development uses self-signed SSL certificates
+- SELinux is set to permissive mode for development
+- HTTPS is enforced (HTTP redirects to HTTPS)
+- API endpoints are properly proxied
 
 ## Production Service Usage Risks
 
@@ -49,48 +78,24 @@ Never connect to production database during development to prevent accidental da
    - Unintended side effects on real user data
 
 2. **Security Vulnerabilities**
-   - Exposure of production credentials
-   - Increased attack surface
-   - Risk of credential leakage in development
-   - Accidental commits of sensitive data
+   - Exposing production credentials
+   - Security token leaks
+   - Unauthorized access risks
 
-3. **Email System Risks**
-   - Creation of test accounts in production
-   - Accidental emails to real users
-   - Impact on email quotas and deliverability
-   - Mail server reputation risks
+## Security Differences
 
-4. **Performance Impact**
-   - Slower development cycle
-   - Production service degradation
-   - Network-related issues
-   - Resource contention
+### Development
+1. Self-signed SSL certificates
+2. SELinux in permissive mode
+3. Local domain (cosmic-nexus.local)
+4. Development database
 
-5. **Development Limitations**
-   - Dependency on internet connection
-   - Limited testing capabilities
-   - Difficulty in debugging
-   - Constrained experimentation
-
-### Recommended Approach
-
-1. **Local Development**
-   - Use local MongoDB instance
-   - Run local API server
-   - Local file storage
-   - Local user management
-
-2. **Production Integration**
-   - Only use production mail server (necessary evil)
-   - Keep separate development subdomain
-   - Strict access controls
-   - Regular security audits
-
-3. **Testing Strategy**
-   - Create comprehensive test environment
-   - Use mocks when possible
-   - Implement proper cleanup procedures
-   - Regular backup verification
+### Production
+1. Valid SSL certificates
+2. SELinux in enforcing mode
+3. Production domain (csmcl.space)
+4. Production database
+5. DKIM, SPF, and DMARC configured
 
 ## Domain Services
 - **Web Server**: `csmcl.space`
@@ -113,12 +118,12 @@ PORT=5000
 MONGODB_URI=mongodb://localhost:27017/cosmic-nexus-dev
 JWT_SECRET=development_secret
 JWT_EXPIRES_IN=7d
-MAIL_HOST=mail.dev.cosmical.me
+MAIL_HOST=mail.cosmical.me
 MAIL_PORT=587
-MAIL_USER=noreply@dev.cosmical.me
-MAIL_FROM=Cosmic Nexus Dev <noreply@dev.cosmical.me>
-FRONTEND_URL=http://localhost:3000
-MAIL_DOMAIN=dev.cosmical.me
+MAIL_USER=noreply@cosmical.me
+MAIL_FROM=Cosmic Nexus Dev <noreply@cosmical.me>
+FRONTEND_URL=https://cosmic-nexus.local
+MAIL_DOMAIN=cosmical.me
 ```
 
 ### Production (.env.production)
@@ -174,28 +179,14 @@ Both environments use the same mail server (`mail.cosmical.me`) but with differe
 ## Troubleshooting
 
 ### Common Issues
-1. MongoDB Connection
-   ```bash
-   # Check MongoDB status
-   sudo systemctl status mongod
-   
-   # Start MongoDB if not running
-   sudo systemctl start mongod
-   ```
-
-2. Email Server
-   ```bash
-   # Test mail server connection
-   telnet mail.cosmical.me 587
-   ```
-
-3. API Connection
-   - Check if backend is running on port 5000
-   - Verify proxy settings in `vite.config.js`
-   - Check CORS configuration in backend
-
-### Logs
-- Frontend logs: Browser console
-- Backend logs: Terminal running backend server
-- MongoDB logs: `/var/log/mongodb/mongod.log`
-- Email logs: Available in backend console with debug mode enabled
+1. Certificate warnings in browser
+   - Expected for self-signed certificates
+   - Safe to proceed in development environment
+2. Permission issues
+   - Check Nginx logs
+   - Verify file permissions
+   - SELinux contexts if enabled
+3. API connection issues
+   - Verify Nginx proxy configuration
+   - Check backend service status
+   - Review API logs
