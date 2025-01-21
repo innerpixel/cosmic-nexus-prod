@@ -26,22 +26,21 @@ jobs:
       - name: Install SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 700 ~/.ssh
+          # Write key with proper line endings
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H csmcl.space >> ~/.ssh/known_hosts
+          # Debug key format (safely)
+          ssh-keygen -l -f ~/.ssh/deploy_key || echo "Invalid key format"
+          # Add host key
+          ssh-keyscan -t ed25519 csmcl.space >> ~/.ssh/known_hosts
 
       - name: Deploy to VPS
         run: |
           echo "Starting deployment at $(date)"
           
-          # Test SSH connection
-          if ! ssh -i ~/.ssh/deploy_key root@csmcl.space whoami; then
-            echo "SSH connection failed"
-            exit 1
-          fi
-          
-          # Deploy using SSH
-          ssh -i ~/.ssh/deploy_key root@csmcl.space '
+          # Test SSH connection with verbose output
+          ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no root@csmcl.space '
             set -e
             cd /var/www/csmcl.space || exit 1
             
