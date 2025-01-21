@@ -26,25 +26,26 @@ jobs:
 
       - name: Install SSH key
         run: |
+          # Setup SSH directory
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 700 ~/.ssh
+          
+          # Decode and store the SSH key
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          echo "Host ${{ env.SSH_HOST }}" >> ~/.ssh/config
-          echo "  IdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
-          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+          
+          # Add known hosts
+          ssh-keyscan -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+          
+          # Debug SSH key (safely)
+          ssh-keygen -l -f ~/.ssh/deploy_key || echo "Invalid key format"
 
       - name: Deploy to VPS
-        env:
-          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
           echo "Starting deployment at $(date)"
           
-          # Start SSH agent
-          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
-          ssh-add ~/.ssh/deploy_key
-          
           # Deploy using SSH with proper command formatting
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ env.SSH_HOST }} "
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ env.SSH_HOST }} "
             set -e;
             
             echo 'Updating repository...';
