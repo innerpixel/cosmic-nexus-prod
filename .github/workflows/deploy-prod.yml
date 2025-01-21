@@ -17,89 +17,45 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Debug Environment
-        run: |
-          echo "Current directory: $(pwd)"
-          echo "Directory contents:"
-          ls -la
-          echo "GitHub workspace: $GITHUB_WORKSPACE"
-          echo "Runner OS: $RUNNER_OS"
-
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.0
-        env:
-          DEPLOY_TIME: $(date)
         with:
           host: csmcl.space
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           debug: true
-          envs: DEPLOY_TIME
           script: |
             set -e
-            echo "Starting deployment at $DEPLOY_TIME"
+            echo "Starting deployment at $(date)"
             
-            # Debug server environment
-            echo "Current user: $(whoami)"
-            echo "Current directory: $(pwd)"
-            echo "Server date: $(date)"
+            echo "Checking directory structure..."
+            cd /var/www/csmcl.space
+            ls -la
             
-            echo "Updating repository..."
-            cd /var/www/csmcl.space || {
-              echo "Failed to change to project directory"
-              exit 1
-            }
+            # Create backend directory if it doesn't exist
+            if [ ! -d "backend" ]; then
+              echo "Creating backend directory..."
+              mkdir -p backend
+            fi
             
-            echo "Git status before pull:"
+            echo "Git status:"
             git status
-            git pull origin main || {
-              echo "Failed to pull from git"
-              exit 1
-            }
+            git pull origin main
             
             echo "Building frontend..."
-            cd frontend || {
-              echo "Failed to change to frontend directory"
-              exit 1
-            }
-            npm ci || {
-              echo "Failed to install frontend dependencies"
-              exit 1
-            }
-            npm run build || {
-              echo "Failed to build frontend"
-              exit 1
-            }
+            cd frontend
+            npm ci
+            npm run build
             
-            echo "Updating backend..."
-            cd ../backend || {
-              echo "Failed to change to backend directory"
-              exit 1
-            }
-            npm ci || {
-              echo "Failed to install backend dependencies"
-              exit 1
-            }
+            echo "Setting up backend..."
+            cd ../backend
+            if [ ! -f "package.json" ]; then
+              echo "Initializing backend package.json..."
+              npm init -y
+            fi
+            npm ci
             
-            echo "Restarting services..."
-            sudo systemctl restart csmcl-space || {
-              echo "Failed to restart service"
-              exit 1
-            }
+            echo "Restarting service..."
+            sudo systemctl restart csmcl-space
             
-            echo "Checking service status..."
-            sudo systemctl status csmcl-space --no-pager
-            
-            echo "Deployment completed successfully at $(date)"
-
-      - name: Deployment Status
-        if: always()
-        run: |
-          echo "Deployment workflow completed"
-          echo "Time: $(date)"
+            echo "Deployment completed at $(date)"
