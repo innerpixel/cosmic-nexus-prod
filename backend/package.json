@@ -1,19 +1,25 @@
 {
-  "name": "csmcl-space-backend",
+  "name": "cosmic-nexus-server",
   "version": "1.0.0",
-  "description": "Backend for CSMCL Space",
+  "description": "Backend server for Cosmic Nexus",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
+    "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "test": "vitest",
+    "test:emails": "node src/scripts/test-emails.js",
+    "test:users": "node src/scripts/test-user-flows.js",
+    "test:watch": "NODE_ENV=test vitest",
+    "test:coverage": "NODE_ENV=test vitest run --coverage",
+    "build": "mkdir -p dist && cp -r src/* dist/ && cp package.json dist/"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
     "axios": "^1.7.9",
     "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
     "dotenv": "^16.3.1",
+    "express": "^4.18.2",
     "express-rate-limit": "^7.5.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
