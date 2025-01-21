@@ -12,7 +12,6 @@ jobs:
     
     env:
       NODE_VERSION: '18'
-      SSH_HOST: 'csmcl.space'
 
     steps:
       - name: Checkout code
@@ -26,46 +25,41 @@ jobs:
 
       - name: Install SSH key
         run: |
-          # Setup SSH directory
           mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          
-          # Decode and store the SSH key
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/deploy_key
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          
-          # Add known hosts
-          ssh-keyscan -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
-          
-          # Debug SSH key (safely)
-          ssh-keygen -l -f ~/.ssh/deploy_key || echo "Invalid key format"
+          ssh-keyscan -H csmcl.space >> ~/.ssh/known_hosts
 
       - name: Deploy to VPS
         run: |
           echo "Starting deployment at $(date)"
           
-          # Deploy using SSH with proper command formatting
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ env.SSH_HOST }} "
-            set -e;
+          # Test SSH connection
+          if ! ssh -i ~/.ssh/deploy_key root@csmcl.space whoami; then
+            echo "SSH connection failed"
+            exit 1
+          fi
+          
+          # Deploy using SSH
+          ssh -i ~/.ssh/deploy_key root@csmcl.space '
+            set -e
+            cd /var/www/csmcl.space || exit 1
             
-            echo 'Updating repository...';
-            cd /var/www/csmcl.space;
-            git pull origin main;
+            echo "Pulling latest changes..."
+            git pull origin main
             
-            echo 'Building frontend...';
-            cd frontend;
-            npm ci;
-            npm run build;
+            echo "Building frontend..."
+            cd frontend
+            npm ci
+            npm run build
             
-            echo 'Updating backend...';
-            cd ../backend;
-            npm ci;
+            echo "Updating backend..."
+            cd ../backend
+            npm ci
             
-            echo 'Restarting services...';
-            sudo systemctl restart csmcl-space;
+            echo "Restarting services..."
+            sudo systemctl restart csmcl-space
             
-            echo 'Checking service status...';
-            sudo systemctl status csmcl-space --no-pager;
-            
-            echo 'Deployment completed at $(date)';
-          "
+            echo "Checking service status..."
+            sudo systemctl status csmcl-space --no-pager
+          '
