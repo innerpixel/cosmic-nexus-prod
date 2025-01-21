@@ -24,4 +24,4 @@ jobs:
             npm run build
             cd ../backend
             npm install
-            pm2 restart cosmic-nexus
+            sudo systemctl restart cosmic-nexus

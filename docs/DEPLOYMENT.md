@@ -216,44 +216,6 @@ FRONTEND_URL=https://csmcl.space
 VITE_API_URL=https://csmcl.space/api
 ```
 
-## Deployment Process
-
-### 1. Building the Application
-
-```bash
-# Frontend
-npm run build
-
-# Backend
-cd server && npm install && npm run build
-```
-
-### 2. Deploying Updates
-
-```bash
-# Deploy frontend
-rsync -avz --delete dist/ root@147.93.58.192:/var/www/cosmic-nexus/frontend/dist/
-
-# Deploy backend
-rsync -avz --exclude 'node_modules' --exclude '.env' server/ root@147.93.58.192:/var/www/cosmic-nexus/backend/
-```
-
-### 3. Post-Deployment Steps
-
-```bash
-ssh root@147.93.58.192
-
-# Install backend dependencies
-cd /var/www/cosmic-nexus/backend && npm install
-
-# Update permissions
-chown -R www-data:www-data /var/www/cosmic-nexus
-
-# Restart services
-systemctl restart cosmic-nexus
-systemctl reload nginx
-```
-
 ## Production Deployment
 
 ### Initial VPS Setup
@@ -264,13 +226,32 @@ systemctl reload nginx
    sudo chown -R www-data:www-data /var/www/cosmic-nexus
    ```
 
-2. **Install PM2**:
-   ```bash
-   sudo npm install -g pm2
-   pm2 startup
+2. **Setup Systemd Service**:
+   Create `/etc/systemd/system/cosmic-nexus.service`:
+   ```ini
+   [Unit]
+   Description=Cosmic Nexus Backend
+   After=network.target
+
+   [Service]
+   Type=simple
+   User=www-data
+   WorkingDirectory=/var/www/cosmic-nexus/backend
+   ExecStart=/usr/bin/node src/index.js
+   Restart=always
+   Environment=NODE_ENV=production
+
+   [Install]
+   WantedBy=multi-user.target
    ```
 
-3. **Clone Production Repository**:
+3. **Enable and Start Service**:
+   ```bash
+   sudo systemctl enable cosmic-nexus
+   sudo systemctl start cosmic-nexus
+   ```
+
+4. **Clone Production Repository**:
    ```bash
    cd /var/www
    git clone git@github.com:innerpixel/cosmic-nexus-prod.git cosmic-nexus
@@ -312,22 +293,23 @@ systemctl reload nginx
                npm run build
                cd ../backend
                npm install
-               pm2 restart cosmic-nexus
+               sudo systemctl restart cosmic-nexus
    ```
 
-### PM2 Process Setup
+### Service Management
 
-1. **Start Application**:
+1. **Monitor Service**:
    ```bash
-   cd /var/www/cosmic-nexus/backend
-   pm2 start src/index.js --name cosmic-nexus
-   pm2 save
+   sudo systemctl status cosmic-nexus
+   sudo journalctl -u cosmic-nexus -f
    ```
 
-2. **Monitor Application**:
+2. **Service Controls**:
    ```bash
-   pm2 status
-   pm2 logs cosmic-nexus
+   sudo systemctl start cosmic-nexus    # Start service
+   sudo systemctl stop cosmic-nexus     # Stop service
+   sudo systemctl restart cosmic-nexus  # Restart service
+   sudo systemctl reload cosmic-nexus   # Reload configuration
    ```
 
 ### SSL Configuration
@@ -359,11 +341,11 @@ systemctl reload nginx
    - Pulls latest changes
    - Installs dependencies
    - Builds frontend
-   - Restarts backend
+   - Restarts systemd service
 
 3. Monitor deployment:
    - Check GitHub Actions status
-   - Monitor PM2 logs
+   - Monitor systemd service logs
    - Verify site functionality
 
 ### Rollback Process
@@ -375,7 +357,7 @@ git log --oneline  # Find commit to roll back to
 git reset --hard <commit-hash>
 cd frontend && npm install && npm run build
 cd ../backend && npm install
-pm2 restart cosmic-nexus
+sudo systemctl restart cosmic-nexus
 ```
 
 ## Maintenance
@@ -383,22 +365,22 @@ pm2 restart cosmic-nexus
 ### Service Management
 ```bash
 # Backend service
-systemctl status cosmic-nexus
-systemctl start cosmic-nexus
-systemctl stop cosmic-nexus
-systemctl restart cosmic-nexus
+sudo systemctl status cosmic-nexus
+sudo systemctl start cosmic-nexus
+sudo systemctl stop cosmic-nexus
+sudo systemctl restart cosmic-nexus
 
 # MongoDB
-systemctl status mongod
-systemctl restart mongod
+sudo systemctl status mongod
+sudo systemctl restart mongod
 
 # Nginx
-systemctl status nginx
-systemctl reload nginx
+sudo systemctl status nginx
+sudo systemctl reload nginx
 ```
 
 ### Log Locations
-- Backend: `journalctl -u cosmic-nexus`
+- Backend: `sudo journalctl -u cosmic-nexus`
 - MongoDB: `/var/log/mongodb/mongod.log`
 - Nginx: `/var/log/nginx/{access,error}.log`
 - Mail: `/var/log/mail.log`
@@ -439,7 +421,7 @@ tar -czf /backup/cosmic-nexus-$(date +%Y%m%d).tar.gz /var/www/cosmic-nexus
 
 1. **Backend Service Won't Start**
    ```bash
-   journalctl -u cosmic-nexus -n 50
+   sudo journalctl -u cosmic-nexus -n 50
    ```
 
 2. **MongoDB Connection Issues**
@@ -449,12 +431,12 @@ tar -czf /backup/cosmic-nexus-$(date +%Y%m%d).tar.gz /var/www/cosmic-nexus
 
 3. **Nginx Configuration Test**
    ```bash
-   nginx -t
+   sudo nginx -t
    ```
 
 4. **SSL Certificate Issues**
    ```bash
-   certbot certificates
+   sudo certbot certificates
    ```
 
 5. **Permission Issues**
