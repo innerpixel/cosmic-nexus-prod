@@ -63,3 +63,7 @@ deploy-prod.sh
 
 # Local development files
 storage/dev/
+
+# Keep frontend/dist for deployment
+!frontend/dist/
+!frontend/dist/*
