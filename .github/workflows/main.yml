@@ -9,48 +9,26 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
-    env:
-      NODE_VERSION: '18'
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H csmcl.space >> ~/.ssh/known_hosts
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+      - name: Test SSH Connection
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no root@csmcl.space 'echo "SSH connection successful"'
 
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: csmcl.space
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
-          command_timeout: 30m
-          script: |
-            echo "Starting deployment at $(date)"
-            
-            echo "Updating repository..."
+      - name: Deploy
+        if: success()
+        run: |
+          ssh -i ~/.ssh/deploy_key root@csmcl.space '
             cd /var/www/csmcl.space
             git pull origin main
-            
-            echo "Building frontend..."
-            cd frontend
-            npm ci
-            npm run build
-            
-            echo "Updating backend..."
-            cd ../backend
-            npm ci
-            
-            echo "Restarting services..."
+            cd frontend && npm ci && npm run build
+            cd ../backend && npm ci
             sudo systemctl restart csmcl-space
-            
-            echo "Checking service status..."
-            sudo systemctl status csmcl-space --no-pager
-            
-            echo "Deployment completed at $(date)"
+          '
