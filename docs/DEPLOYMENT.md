@@ -254,6 +254,130 @@ systemctl restart cosmic-nexus
 systemctl reload nginx
 ```
 
+## Production Deployment
+
+### Initial VPS Setup
+
+1. **Create Deployment Directory**:
+   ```bash
+   sudo mkdir -p /var/www/cosmic-nexus
+   sudo chown -R www-data:www-data /var/www/cosmic-nexus
+   ```
+
+2. **Install PM2**:
+   ```bash
+   sudo npm install -g pm2
+   pm2 startup
+   ```
+
+3. **Clone Production Repository**:
+   ```bash
+   cd /var/www
+   git clone git@github.com:innerpixel/cosmic-nexus-prod.git cosmic-nexus
+   ```
+
+### GitHub Actions Setup
+
+1. **Add Repository Secrets**:
+   - Go to Settings > Secrets and Variables > Actions
+   - Add the following secrets:
+     - `SSH_USERNAME`: VPS SSH username
+     - `SSH_PRIVATE_KEY`: SSH private key for VPS access
+
+2. **Workflow File**:
+   `.github/workflows/deploy-prod.yml` handles automated deployment:
+   ```yaml
+   name: Deploy to Production
+   
+   on:
+     push:
+       branches:
+         - main
+   
+   jobs:
+     deploy:
+       runs-on: ubuntu-latest
+       steps:
+         - name: Deploy to VPS
+           uses: appleboy/ssh-action@master
+           with:
+             host: csmcl.space
+             username: ${{ secrets.SSH_USERNAME }}
+             key: ${{ secrets.SSH_PRIVATE_KEY }}
+             script: |
+               cd /var/www/cosmic-nexus
+               git pull origin main
+               cd frontend
+               npm install
+               npm run build
+               cd ../backend
+               npm install
+               pm2 restart cosmic-nexus
+   ```
+
+### PM2 Process Setup
+
+1. **Start Application**:
+   ```bash
+   cd /var/www/cosmic-nexus/backend
+   pm2 start src/index.js --name cosmic-nexus
+   pm2 save
+   ```
+
+2. **Monitor Application**:
+   ```bash
+   pm2 status
+   pm2 logs cosmic-nexus
+   ```
+
+### SSL Configuration
+
+1. **Install Certbot**:
+   ```bash
+   sudo apt install certbot python3-certbot-nginx
+   ```
+
+2. **Obtain SSL Certificate**:
+   ```bash
+   sudo certbot --nginx -d csmcl.space
+   ```
+
+3. **Auto-renewal**:
+   ```bash
+   sudo systemctl status certbot.timer
+   ```
+
+### Deployment Flow
+
+1. Push changes to GitHub:
+   ```bash
+   git push production main
+   ```
+
+2. GitHub Actions automatically:
+   - Connects to VPS via SSH
+   - Pulls latest changes
+   - Installs dependencies
+   - Builds frontend
+   - Restarts backend
+
+3. Monitor deployment:
+   - Check GitHub Actions status
+   - Monitor PM2 logs
+   - Verify site functionality
+
+### Rollback Process
+
+If needed, roll back to previous version:
+```bash
+cd /var/www/cosmic-nexus
+git log --oneline  # Find commit to roll back to
+git reset --hard <commit-hash>
+cd frontend && npm install && npm run build
+cd ../backend && npm install
+pm2 restart cosmic-nexus
+```
+
 ## Maintenance
 
 ### Service Management
@@ -331,6 +455,19 @@ tar -czf /backup/cosmic-nexus-$(date +%Y%m%d).tar.gz /var/www/cosmic-nexus
 4. **SSL Certificate Issues**
    ```bash
    certbot certificates
+   ```
+
+5. **Permission Issues**
+   ```bash
+   # Fix web directory permissions
+   sudo chown -R $USER:$USER /var/www/cosmic-nexus
+
+   # Fix storage directory permissions
+   sudo chown -R $USER:$USER storage/
+   chmod -R 755 storage/
+
+   # Fix log file permissions
+   sudo chown $USER:$USER /var/log/cosmic-nexus.log
    ```
 
 ### Health Checks
@@ -518,6 +655,10 @@ This script:
 ```bash
 # Fix web directory permissions
 sudo chown -R $USER:$USER /var/www/cosmic-nexus
+
+# Fix storage directory permissions
+sudo chown -R $USER:$USER storage/
+chmod -R 755 storage/
 
 # Fix log file permissions
 sudo chown $USER:$USER /var/log/cosmic-nexus.log
