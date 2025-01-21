@@ -1,0 +1,70 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_reason:
+        description: 'Reason for deployment'
+        required: false
+        default: 'Manual deployment'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    env:
+      NODE_VERSION: '18'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: csmcl.space
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          debug: true
+          script: |
+            echo "Starting deployment at $(date)"
+            echo "Deployment reason: ${{ github.event.inputs.deploy_reason }}"
+            
+            # Navigate to project directory
+            cd /var/www/csmcl.space
+            
+            # Pull latest changes
+            git pull origin main
+            
+            # Frontend deployment
+            echo "Deploying frontend..."
+            cd frontend
+            npm ci
+            npm run build
+            
+            # Backend deployment
+            echo "Deploying backend..."
+            cd ../backend
+            npm ci
+            
+            # Restart service
+            echo "Restarting service..."
+            sudo systemctl restart csmcl-space
+            
+            # Verify service status
+            echo "Service status:"
+            sudo systemctl status csmcl-space --no-pager
+            
+            # Check if service is running
+            if ! systemctl is-active --quiet csmcl-space; then
+              echo "Service failed to start"
+              exit 1
+            fi
+            
+            echo "Deployment completed successfully at $(date)"
