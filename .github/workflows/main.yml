@@ -1,0 +1,64 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    env:
+      NODE_VERSION: '18'
+      SSH_HOST: 'csmcl.space'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "Host ${{ env.SSH_HOST }}" >> ~/.ssh/config
+          echo "  IdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+
+      - name: Deploy to VPS
+        run: |
+          echo "Starting deployment at $(date)"
+          
+          # Deploy using SSH
+          ssh ${{ secrets.SSH_USERNAME }}@${{ env.SSH_HOST }} '
+            set -e
+            
+            echo "Updating repository..."
+            cd /var/www/csmcl.space
+            git pull origin main
+            
+            echo "Building frontend..."
+            cd frontend
+            npm ci
+            npm run build
+            
+            echo "Updating backend..."
+            cd ../backend
+            npm ci
+            
+            echo "Restarting services..."
+            sudo systemctl restart csmcl-space
+            
+            echo "Checking service status..."
+            sudo systemctl status csmcl-space --no-pager
+            
+            echo "Deployment completed at $(date)"
+          '
