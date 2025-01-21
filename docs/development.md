@@ -1,201 +1,243 @@
 # Development Guide
 
-## Environment Setup
+## Getting Started
 
-### Local Development Environment
-- **Frontend**: `http://localhost:3000`
-- **Backend API**: `http://localhost:5000`
-- **Database**: `mongodb://localhost:27017/cosmic-nexus-dev`
-- **Mail Server**: `mail.dev.cosmical.me` (remote mail server)
+### Prerequisites
+- Node.js v20.17.0 or higher
+- MongoDB 5.0 or higher
+- Nginx
+- Postfix
+- Git
 
-### VPS Production Environment
-- **Frontend**: `https://csmcl.space`
-- **Backend API**: `https://csmcl.space/api`
-- **Database**: `mongodb://csmcl.space:27017/cosmic-nexus-prod`
-- **Mail Server**: `mail.cosmical.me`
+### Tech Stack
+- **Frontend**: Vue.js 3 + Vite + Tailwind CSS
+- **Backend**: Node.js + Express
+- **Database**: MongoDB
+- **Mail Server**: Local Postfix (dev) / cosmical.me (prod)
+- **Web Server**: Nginx
 
-## Development vs Production
+## Local Development Environment
 
-### Local Development
-When developing locally, you should:
-1. Use local MongoDB instance (`cosmic-nexus-dev` database)
-2. Run local API server on port 5000
-3. Run local frontend server on port 3000
-4. Connect to remote mail server for email functionality
-
-Benefits:
-- Safe environment for testing
-- No risk of affecting production data
-- Faster development cycle
-- Works offline (except for email features)
-
-### Production Environment
-Production environment uses:
-1. VPS MongoDB instance (`cosmic-nexus-prod` database)
-2. VPS API server
-3. Production frontend
-4. Same mail server as development
-
-Never connect to production database during development to prevent accidental data modifications.
-
-## Production Service Usage Risks
-
-### Risks of Using Production Services in Development
-
-1. **Data Integrity Risks**
-   - Accidental modification of production data
-   - Mixing test and production data
-   - Database corruption risks
-   - Unintended side effects on real user data
-
-2. **Security Vulnerabilities**
-   - Exposure of production credentials
-   - Increased attack surface
-   - Risk of credential leakage in development
-   - Accidental commits of sensitive data
-
-3. **Email System Risks**
-   - Creation of test accounts in production
-   - Accidental emails to real users
-   - Impact on email quotas and deliverability
-   - Mail server reputation risks
-
-4. **Performance Impact**
-   - Slower development cycle
-   - Production service degradation
-   - Network-related issues
-   - Resource contention
-
-5. **Development Limitations**
-   - Dependency on internet connection
-   - Limited testing capabilities
-   - Difficulty in debugging
-   - Constrained experimentation
-
-### Recommended Approach
-
-1. **Local Development**
-   - Use local MongoDB instance
-   - Run local API server
-   - Local file storage
-   - Local user management
-
-2. **Production Integration**
-   - Only use production mail server (necessary evil)
-   - Keep separate development subdomain
-   - Strict access controls
-   - Regular security audits
-
-3. **Testing Strategy**
-   - Create comprehensive test environment
-   - Use mocks when possible
-   - Implement proper cleanup procedures
-   - Regular backup verification
-
-## Domain Services
-- **Web Server**: `csmcl.space`
-  - Serves web content and API
-  - Hosts MongoDB database
-  - SSL configured with HTTPS
-  - DKIM, SPF, and DMARC configured for email authentication
-
-- **Mail Server**: `cosmical.me`
-  - Dedicated mail server only
-  - Does not serve web content
-  - Handles all email communications
-  - SMTP configuration on port 587
-
-## Environment Files
-
-### Development (.env.development)
-```env
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/cosmic-nexus-dev
-JWT_SECRET=development_secret
-JWT_EXPIRES_IN=7d
-MAIL_HOST=mail.dev.cosmical.me
-MAIL_PORT=587
-MAIL_USER=noreply@dev.cosmical.me
-MAIL_FROM=Cosmic Nexus Dev <noreply@dev.cosmical.me>
-FRONTEND_URL=http://localhost:3000
-MAIL_DOMAIN=dev.cosmical.me
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd StarterTemplateDesignIdeas
 ```
 
-### Production (.env.production)
+### 2. Set Up Local Domain
+Add to `/etc/hosts`:
+```
+127.0.0.1 local-dev.test
+```
+
+### 3. Install Dependencies
+```bash
+# Install frontend dependencies
+npm install
+
+# Install backend dependencies
+cd server
+npm install
+```
+
+### 4. Configure Environment
+Create `.env.development` in project root:
 ```env
-PORT=5000
-MONGODB_URI=${MONGO_URI}
-JWT_SECRET=${JWT_SECRET}
-JWT_EXPIRES_IN=7d
-MAIL_HOST=mail.cosmical.me
-MAIL_PORT=587
-MAIL_USER=noreply@cosmical.me
-MAIL_FROM=Cosmic Nexus <noreply@cosmical.me>
-FRONTEND_URL=${FRONTEND_URL}
-MAIL_DOMAIN=cosmical.me
+NODE_ENV=development
+MONGODB_URI=mongodb://localhost:27017/cosmic-nexus
+API_BASE_URL=http://local-dev.test:5000/api
+FRONTEND_URL=http://local-dev.test:3000
+MAIL_API_ENDPOINT=http://local-dev.test:25/api
+MAIL_DOMAIN=local-dev.test
+SMTP_HOST=localhost
+SMTP_PORT=25
+SMTP_SECURE=false
+```
+
+### 5. Start Development Servers
+
+#### Frontend Development
+```bash
+npm run dev
+```
+
+#### Backend Development
+```bash
+cd server
+npm run dev
 ```
 
 ## Development Workflow
 
-### Starting Development Environment
-1. Run the development script:
-   ```bash
-   ./development.sh
-   ```
-   This will:
-   - Start local MongoDB
-   - Start backend server on port 5000
-   - Start frontend Vite server on port 3000
+### Git Branches
+- `main`: Production-ready code
+- `stable-auth`: Stable authentication system
+- `feature/auth-testing`: Authentication testing features
+- `feature/*`: New features
 
-### API Proxy Configuration
-The frontend Vite server is configured to proxy API requests:
-- All requests to `/api/*` are forwarded to `http://localhost:5000`
-- WebSocket connections are supported
-- Detailed proxy logs are enabled for debugging
+### Local Git Setup
+```bash
+# Add local remote for development
+git remote add local /var/git/local.csmcl-space.git
 
-### Database Management
-- Development database: `cosmic-nexus-dev`
-- Production database: `cosmic-nexus-prod`
-- Each environment has its own database to prevent mixing data
-- MongoDB authentication is required in both environments
+# Push to local development server
+git push local <branch-name>
+```
 
-### Email Configuration
-Both environments use the same mail server (`mail.cosmical.me`) but with different configurations:
-- Development: Emails are sent with development-specific templates
-- Production: Emails use production templates with proper branding
+### Code Style
+- Use ESLint and Prettier for code formatting
+- Follow Vue.js style guide
+- Use TypeScript for type safety
+- Write meaningful commit messages
 
-### Security Notes
-1. JWT secrets are environment-specific
-2. Development uses simpler secrets for easier debugging
-3. Production uses strong, unique secrets
-4. SSL/TLS is enabled in production only
-5. CORS is configured to allow only specific origins
+## Testing
 
-## Troubleshooting
+### Unit Tests
+```bash
+# Run frontend tests
+npm run test:unit
 
-### Common Issues
-1. MongoDB Connection
-   ```bash
-   # Check MongoDB status
-   sudo systemctl status mongod
-   
-   # Start MongoDB if not running
-   sudo systemctl start mongod
-   ```
+# Run backend tests
+cd server
+npm run test
+```
 
-2. Email Server
-   ```bash
-   # Test mail server connection
-   telnet mail.cosmical.me 587
-   ```
+### User Flow Tests
+```bash
+cd server
+NODE_ENV=development npm run test:users
+```
 
-3. API Connection
-   - Check if backend is running on port 5000
-   - Verify proxy settings in `vite.config.js`
-   - Check CORS configuration in backend
+### Mail Testing
+- Check `/var/log/maillog` for mail delivery logs
+- Use local postfix for development
+- Monitor mail queue with `mailq`
 
-### Logs
-- Frontend logs: Browser console
-- Backend logs: Terminal running backend server
-- MongoDB logs: `/var/log/mongodb/mongod.log`
-- Email logs: Available in backend console with debug mode enabled
+## Building
+
+### Production Build
+```bash
+# Build frontend
+npm run build
+
+# Start production server
+cd server
+NODE_ENV=production node src/index.js
+```
+
+### Local Deployment
+```bash
+# Deploy to local development server
+./deployment/deploy-app.sh
+```
+
+## Debugging
+
+### Frontend
+- Vue DevTools for component inspection
+- Browser DevTools for network/console
+- Vite debugging tools
+
+### Backend
+- Use `console.log` for basic debugging
+- Check `/var/log/cosmic-nexus.log`
+- MongoDB logs in `/var/log/mongodb/mongod.log`
+
+### Mail
+- Check `/var/log/maillog`
+- Monitor postfix queue
+- Test mail delivery with `mail` command
+
+## API Documentation
+
+### Authentication Endpoints
+
+#### POST /api/auth/register
+```javascript
+{
+  "displayName": "string",
+  "csmclName": "string",
+  "regularEmail": "string",
+  "simNumber": "string",
+  "password": "string"
+}
+```
+
+#### POST /api/auth/verify-email
+```javascript
+{
+  "token": "string"
+}
+```
+
+#### POST /api/auth/login
+```javascript
+{
+  "email": "string",
+  "password": "string"
+}
+```
+
+## Common Development Tasks
+
+### 1. Creating New Components
+```bash
+# Create new component
+touch src/components/NewComponent.vue
+```
+
+### 2. Adding Routes
+Edit `src/router/index.js`:
+```javascript
+{
+  path: '/new-route',
+  component: () => import('@/views/NewView.vue')
+}
+```
+
+### 3. Database Operations
+```bash
+# Access MongoDB shell
+mongosh cosmic-nexus
+
+# Backup database
+mongodump --db cosmic-nexus
+
+# Restore database
+mongorestore --db cosmic-nexus dump/cosmic-nexus
+```
+
+### 4. Nginx Configuration
+```bash
+# Test configuration
+sudo nginx -t
+
+# Reload configuration
+sudo nginx -s reload
+```
+
+## Troubleshooting Development
+
+### 1. Frontend Issues
+- Clear browser cache
+- Check Vue DevTools
+- Verify environment variables
+- Check build output
+
+### 2. Backend Issues
+- Check server logs
+- Verify MongoDB connection
+- Test API endpoints
+- Check environment variables
+
+### 3. Database Issues
+- Verify MongoDB service
+- Check connection string
+- Review indexes
+- Monitor performance
+
+### 4. Mail Issues
+- Check postfix status
+- Review mail logs
+- Test mail delivery
+- Verify DNS settings

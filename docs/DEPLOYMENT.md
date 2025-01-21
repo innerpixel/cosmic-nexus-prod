@@ -69,20 +69,57 @@ processManagement:
 
 ```
 /var/www/cosmic-nexus/
-├── frontend/           # Static Vue.js files
-│   ├── index.html
-│   └── assets/
-├── backend/           # Node.js application
-│   ├── dist/         # Compiled JavaScript
-│   ├── src/          # Source code
-│   ├── .env          # Environment configuration
-│   └── node_modules/ # Dependencies
+├── frontend/           # Frontend application
+│   ├── dist/          # Built frontend files
+│   └── src/           # Source files
+├── backend/           # Backend application
+│   ├── src/           # Source files
+│   └── config/        # Configuration files
+└── deployment/        # Deployment scripts
 ```
 
 ### 4. Nginx Configuration
 
-Location: `/etc/nginx/sites-available/cosmic-nexus`
+#### Local Development Setup
+Location: `/etc/nginx/conf.d/local-dev.test.conf`
+```nginx
+# HTTP to HTTPS redirect
+server {
+    listen 80;
+    server_name local-dev.test;
+    return 301 https://$server_name$request_uri;
+}
 
+server {
+    listen 443 ssl http2;
+    server_name local-dev.test;
+
+    # SSL Configuration
+    ssl_certificate /etc/nginx/ssl/local-dev.test.crt;
+    ssl_certificate_key /etc/nginx/ssl/local-dev.test.key;
+
+    # Root directory
+    root /var/www/cosmic-nexus/frontend/dist;
+
+    # API Proxy
+    location /api/ {
+        proxy_pass http://localhost:5000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Frontend routing
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+#### Production Setup
+Location: `/etc/nginx/sites-available/cosmic-nexus`
 ```nginx
 server {
     listen 80;
@@ -107,7 +144,7 @@ server {
 
     # Frontend
     location / {
-        root /var/www/cosmic-nexus/frontend;
+        root /var/www/cosmic-nexus/frontend/dist;
         try_files $uri $uri/ /index.html;
         expires 1h;
         add_header Cache-Control "public, no-transform";
@@ -195,7 +232,7 @@ cd server && npm install && npm run build
 
 ```bash
 # Deploy frontend
-rsync -avz --delete dist/ root@147.93.58.192:/var/www/cosmic-nexus/frontend/
+rsync -avz --delete dist/ root@147.93.58.192:/var/www/cosmic-nexus/frontend/dist/
 
 # Deploy backend
 rsync -avz --exclude 'node_modules' --exclude '.env' server/ root@147.93.58.192:/var/www/cosmic-nexus/backend/
@@ -312,3 +349,256 @@ tar -czf /backup/cosmic-nexus-$(date +%Y%m%d).tar.gz /var/www/cosmic-nexus
    ```bash
    telnet mail.cosmical.me 587
    ```
+
+## Environment Overview
+
+### Local Development
+- **Domain**: `local-dev.test`
+- **SSL**: Local certificates via mkcert
+- **Mail Server**: Local postfix for development
+- **Database**: Local MongoDB instance
+- **Web Server**: Nginx with reverse proxy
+
+### Production
+- **Web Domain**: `csmcl.space`
+- **Mail Domain**: `cosmical.me`
+- **Server**: Ubuntu 22.04 LTS
+- **Database**: MongoDB 5+
+- **Node.js**: v20.17.0+
+
+## Directory Structure
+```
+/var/www/cosmic-nexus/
+├── frontend/           # Frontend application
+│   ├── dist/          # Built frontend files
+│   └── src/           # Source files
+├── backend/           # Backend application
+│   ├── src/           # Source files
+│   └── config/        # Configuration files
+└── deployment/        # Deployment scripts
+```
+
+## Git Workflow
+
+### Repository Setup
+```bash
+# Production repository (GitHub)
+git remote add production git@github.com:innerpixel/cosmic-nexus-prod.git
+
+# Local deployment repository
+git remote add local /var/git/local.csmcl-space.git
+```
+
+### Deployment Flow
+1. **Local Development**:
+   ```bash
+   # Deploy to local environment
+   git push local <branch-name>
+   ```
+
+2. **Production**:
+   ```bash
+   # Push stable changes to production
+   git push production main
+   ```
+
+### Branches
+- `main`: Production-ready code
+- `stable-auth`: Stable authentication system
+- `feature/*`: Feature branches
+
+### Branch Strategy
+1. Create feature branches from `main`
+2. Test locally using `git push local feature/branch`
+3. After testing, merge to `main`
+4. Deploy to production with `git push production main`
+
+### Deployment Hooks
+The post-receive hook in `/var/git/local.csmcl-space.git/hooks/post-receive` handles:
+1. Checkout of pushed code to `/var/www/cosmic-nexus/frontend`
+2. Installation of frontend dependencies
+3. Building of frontend
+4. Copying and setting up backend
+5. Installation of backend dependencies
+
+## Local Development Setup
+
+### 1. Prerequisites
+```bash
+# Install required packages
+sudo dnf install nginx mongodb-org postfix
+
+# Create directory structure
+sudo mkdir -p /var/www/cosmic-nexus/{frontend,backend}
+sudo chown -R $USER:$USER /var/www/cosmic-nexus
+
+# Start required services
+sudo systemctl enable --now nginx mongodb postfix
+
+# Install mkcert and create certificates
+mkcert -install
+mkcert local-dev.test
+```
+
+### 2. Nginx Configuration
+Location: `/etc/nginx/conf.d/local-dev.test.conf`
+```nginx
+# HTTP to HTTPS redirect
+server {
+    listen 80;
+    server_name local-dev.test;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name local-dev.test;
+
+    # SSL Configuration
+    ssl_certificate /etc/nginx/ssl/local-dev.test.crt;
+    ssl_certificate_key /etc/nginx/ssl/local-dev.test.key;
+
+    # Root directory
+    root /var/www/cosmic-nexus/frontend/dist;
+
+    # API Proxy
+    location /api/ {
+        proxy_pass http://localhost:5000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Frontend routing
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+### 3. Environment Configuration
+Create `.env.development`:
+```env
+NODE_ENV=development
+MONGODB_URI=mongodb://localhost:27017/cosmic-nexus
+API_BASE_URL=http://local-dev.test:5000/api
+FRONTEND_URL=http://local-dev.test:3000
+MAIL_API_ENDPOINT=http://local-dev.test:25/api
+MAIL_DOMAIN=local-dev.test
+SMTP_HOST=localhost
+SMTP_PORT=25
+SMTP_SECURE=false
+```
+
+### 4. Deployment Process
+The deployment process is handled by `deploy-app.sh`:
+```bash
+./deployment/deploy-app.sh
+```
+
+This script:
+1. Builds the frontend
+2. Copies built files to nginx directory
+3. Installs backend dependencies
+4. Starts the Node.js server
+
+### 5. Monitoring
+- **Frontend**: Served at `https://local-dev.test`
+- **Backend**: Runs on port 5000
+- **Logs**: `/var/log/cosmic-nexus.log`
+- **Mail**: Check `/var/log/maillog` for email delivery
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Permission Issues**
+```bash
+# Fix web directory permissions
+sudo chown -R $USER:$USER /var/www/cosmic-nexus
+
+# Fix log file permissions
+sudo chown $USER:$USER /var/log/cosmic-nexus.log
+```
+
+2. **Server Already Running**
+```bash
+# Kill existing Node.js process
+pkill -f "node.*src/index.js"
+```
+
+3. **MongoDB Connection Issues**
+```bash
+# Check MongoDB status
+sudo systemctl status mongodb
+
+# View MongoDB logs
+sudo tail -f /var/log/mongodb/mongod.log
+```
+
+### Useful Commands
+
+```bash
+# View application logs
+tail -f /var/log/cosmic-nexus.log
+
+# Check nginx configuration
+sudo nginx -t
+
+# Restart nginx
+sudo systemctl restart nginx
+
+# Check mail logs
+tail -f /var/log/maillog
+```
+
+## Security Considerations
+
+1. **SSL Certificates**
+   - Local development uses mkcert
+   - Production uses Let's Encrypt
+
+2. **Environment Variables**
+   - Never commit `.env` files
+   - Use different configs for dev/prod
+
+3. **Access Control**
+   - Proper file permissions
+   - Secure nginx configuration
+   - MongoDB authentication
+
+## Backup and Recovery
+
+### Database Backup
+```bash
+# Backup MongoDB
+mongodump --db cosmic-nexus --out /backup/$(date +%Y%m%d)
+
+# Restore MongoDB
+mongorestore --db cosmic-nexus /backup/YYYYMMDD/cosmic-nexus
+```
+
+### Application Backup
+```bash
+# Backup application files
+tar -czf /backup/app_$(date +%Y%m%d).tar.gz /var/www/cosmic-nexus
+```
+
+## Performance Monitoring
+
+1. **Application Metrics**
+   - Server response times
+   - Database query performance
+   - Memory usage
+
+2. **System Monitoring**
+   - CPU usage
+   - Memory consumption
+   - Disk space
+
+3. **Error Tracking**
+   - Application logs
+   - Nginx error logs
+   - MongoDB logs
