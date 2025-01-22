@@ -8,27 +8,16 @@ import User from '../models/user.model.js'; // Add User model import
 const storageService = new StorageService();
 const router = express.Router();
 
-// Create Ethereal test account for development
-let testAccount = null;
-let transporter = null;
-
-async function setupEtherealEmail() {
-  if (!testAccount) {
-    testAccount = await createTestAccount();
-    console.log('Ethereal Email test account:', testAccount);
-    
-    transporter = createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      },
-    });
+// Create email transporter
+const transporter = nodemailer.createTransport({
+  host: 'cosmical.me',
+  port: 587,
+  secure: false, // Use STARTTLS
+  auth: {
+    user: process.env.MAIL_USER || 'noreply@cosmical.me',
+    pass: process.env.MAIL_PASS
   }
-  return transporter;
-}
+});
 
 // Register endpoint
 router.post('/register', async (req, res) => {
@@ -54,12 +43,9 @@ router.post('/register', async (req, res) => {
     // Save user to database
     await user.save();
     
-    // Setup Ethereal email
-    const emailTransporter = await setupEtherealEmail();
-    
     // Send welcome email
-    const info = await emailTransporter.sendMail({
-      from: '"Cosmic Nexus" <cosmic@nexus.test>',
+    const info = await transporter.sendMail({
+      from: '"Cosmic Nexus" <noreply@cosmical.me>',
       to: email,
       subject: 'Welcome to Cosmic Nexus!',
       text: `Welcome ${name}! Thank you for registering with Cosmic Nexus.`,
@@ -67,7 +53,6 @@ router.post('/register', async (req, res) => {
     });
     
     console.log('Welcome email sent:', info);
-    console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
     
     // Update user storage
     await storageService.createUserFolders(user.email);
@@ -75,7 +60,6 @@ router.post('/register', async (req, res) => {
     res.status(201).json({ 
       message: 'Registration successful',
       user: { id: user.id, email: user.email, name: user.name },
-      emailPreview: nodemailer.getTestMessageUrl(info)
     });
     
   } catch (error) {
