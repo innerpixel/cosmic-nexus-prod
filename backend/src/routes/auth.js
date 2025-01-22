@@ -78,6 +78,62 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// Email verification endpoint
+router.post('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'Verification token is required' 
+      });
+    }
+
+    // Find user with this verification token
+    const user = await User.findOne({ verificationToken: token });
+
+    if (!user) {
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Invalid verification token' 
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'Email is already verified' 
+      });
+    }
+
+    // Check if token is expired
+    if (user.verificationExpires && user.verificationExpires < new Date()) {
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'Verification token has expired' 
+      });
+    }
+
+    // Update user
+    user.isEmailVerified = true;
+    user.verificationToken = undefined;
+    user.verificationExpires = undefined;
+    await user.save();
+
+    res.json({ 
+      status: 'success',
+      message: 'Email verified successfully' 
+    });
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ 
+      status: 'error',
+      message: 'An error occurred during email verification' 
+    });
+  }
+});
+
 // Delete user endpoint
 router.delete('/user/:csmclName', async (req, res) => {
   try {
