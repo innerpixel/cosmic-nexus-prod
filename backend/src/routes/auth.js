@@ -2,6 +2,8 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import nodemailer from 'nodemailer';
 import { createTestAccount, createTransport } from 'ethereal-email';
+import { StorageService } from '../services/storage.service.js';
+const storageService = new StorageService();
 
 const router = express.Router();
 
@@ -73,6 +75,42 @@ router.post('/register', async (req, res) => {
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// Delete user endpoint
+router.delete('/user/:csmclName', async (req, res) => {
+  try {
+    const { csmclName } = req.params;
+    
+    // Find and delete user from database
+    const user = await User.findOne({ csmclName });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Delete user's storage folders
+    await storageService.deleteUserFolders(csmclName);
+    
+    // Delete user from database
+    await User.deleteOne({ csmclName });
+
+    // Execute system user removal command
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    
+    try {
+      await execAsync(`sudo userdel -r ${csmclName}`);
+    } catch (error) {
+      // If system user doesn't exist, we can ignore the error
+      console.log(`System user removal: ${error.message}`);
+    }
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 

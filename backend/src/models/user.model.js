@@ -104,6 +104,40 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   }
 };
 
+// Add cleanup method to schema
+userSchema.statics.cleanup = async function(criteria = {}) {
+  try {
+    const users = await this.find(criteria);
+    const storageService = new StorageService();
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+
+    for (const user of users) {
+      // Delete user's storage folders
+      try {
+        await storageService.deleteUserFolders(user.csmclName);
+      } catch (error) {
+        console.error(`Failed to delete storage for ${user.csmclName}:`, error);
+      }
+
+      // Remove system user
+      try {
+        await execAsync(`sudo userdel -r ${user.csmclName}`);
+      } catch (error) {
+        console.log(`System user removal for ${user.csmclName}:`, error.message);
+      }
+    }
+
+    // Delete users from database
+    await this.deleteMany(criteria);
+    
+    return { message: `Cleaned up ${users.length} users` };
+  } catch (error) {
+    throw new Error(`Cleanup failed: ${error.message}`);
+  }
+};
+
 const User = mongoose.model('User', userSchema);
 
 export default User;
