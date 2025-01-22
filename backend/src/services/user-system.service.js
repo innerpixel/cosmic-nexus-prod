@@ -14,17 +14,17 @@ class UserSystemService {
       console.log(`Creating system user: ${username}`);
       
       // Execute commands separately to match our NOPASSWD sudoers entries
-      await execAsync(`sudo -S /usr/sbin/useradd -m -g ${this.userGroup} -s ${this.defaultShell} ${username}`);
+      await execAsync(`sudo /usr/sbin/useradd -m -g ${this.userGroup} -s ${this.defaultShell} ${username}`);
       console.log('User created, setting password...');
       
-      await execAsync(`echo "${username}:${password}" | sudo -S /usr/bin/chpasswd`);
+      await execAsync(`echo "${username}:${password}" | sudo /usr/bin/chpasswd`);
       console.log('Password set successfully...');
       
       // Create mail directory structure in user's home
-      await execAsync(`sudo -S mkdir -p /home/${username}/Maildir/{new,cur,tmp}`);
-      await execAsync(`sudo -S /usr/sbin/usermod -g ${this.userGroup} ${username}`);
-      await execAsync(`sudo -S chown -R ${username}:${this.userGroup} /home/${username}/Maildir`);
-      await execAsync(`sudo -S chmod -R 700 /home/${username}/Maildir`);
+      await execAsync(`sudo mkdir -p /home/${username}/Maildir/{new,cur,tmp}`);
+      await execAsync(`sudo /usr/sbin/usermod -g ${this.userGroup} ${username}`);
+      await execAsync(`sudo chown -R ${username}:${this.userGroup} /home/${username}/Maildir`);
+      await execAsync(`sudo chmod -R 700 /home/${username}/Maildir`);
       
       // Set quota only in production
       if (!this.isDevelopment) {
@@ -44,11 +44,11 @@ class UserSystemService {
       console.log(`Deleting system user: ${username}`);
       
       // Remove user and their home directory using NOPASSWD command
-      await execAsync(`sudo -S /usr/sbin/userdel -r ${username}`);
+      await execAsync(`sudo /usr/sbin/userdel -r ${username}`);
       
       // Clean up any remaining files
       if (await this.fileExists(`/var/spool/mail/${username}`)) {
-        await execAsync(`sudo -S rm -rf /var/spool/mail/${username}`);
+        await execAsync(`sudo rm -rf /var/spool/mail/${username}`);
       }
       
       console.log(`System user ${username} deleted successfully`);
@@ -79,7 +79,7 @@ class UserSystemService {
     }
     
     try {
-      await execAsync(`sudo -S setquota -u ${username} 0 ${quotaMB}M 0 0 /home`);
+      await execAsync(`sudo setquota -u ${username} 0 ${quotaMB}M 0 0 /home`);
       return true;
     } catch (error) {
       console.error('Error setting user quota:', error);
