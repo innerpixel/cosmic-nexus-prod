@@ -12,12 +12,12 @@ class UserSystemService {
   async createSystemUser(username, password) {
     try {
       console.log(`Creating system user: ${username}`);
-
-      // Create user with home directory and specific shell
-      await execAsync(`sudo useradd -m -g ${this.userGroup} -s ${this.defaultShell} ${username}`);
       
-      // Set user password
-      await execAsync(`echo "${username}:${password}" | sudo chpasswd`);
+      // Create user and set password in one command to avoid race conditions
+      const createUserCmd = `/usr/sbin/useradd -m -g ${this.userGroup} -s ${this.defaultShell} ${username}`;
+      const setPasswdCmd = `echo "${username}:${password}" | /usr/bin/chpasswd`;
+      
+      await execAsync(`sudo ${createUserCmd} && sudo ${setPasswdCmd}`);
       
       // Create mail directory structure
       await execAsync(`sudo mkdir -p /home/${username}/Maildir/{new,cur,tmp}`);
@@ -29,29 +29,11 @@ class UserSystemService {
         await this.setUserQuota(username, 100);
       }
       
-      // Create storage directories
-      const dirs = [
-        'public/photos',
-        'public/documents',
-        'public/shared',
-        'private/backups',
-        'private/settings',
-        'private/mail'
-      ];
-      
-      for (const dir of dirs) {
-        await execAsync(`sudo mkdir -p /home/${username}/${dir}`);
-      }
-      
-      // Set proper ownership and permissions
-      await execAsync(`sudo chown -R ${username}:${this.userGroup} /home/${username}`);
-      await execAsync(`sudo chmod -R 750 /home/${username}`);
-      
       console.log(`System user ${username} created successfully`);
       return true;
     } catch (error) {
-      console.error('Error creating system user:', error);
-      throw error;
+      console.error('Failed to create system user:', error);
+      throw new Error(`Failed to create system user: ${error.message}`);
     }
   }
 
@@ -60,7 +42,7 @@ class UserSystemService {
       console.log(`Deleting system user: ${username}`);
       
       // Remove user and their home directory
-      await execAsync(`sudo userdel -r ${username}`);
+      await execAsync(`sudo /usr/sbin/userdel -r ${username}`);
       
       // Clean up any remaining files
       await execAsync(`sudo rm -rf /var/spool/mail/${username}`);

@@ -3,27 +3,16 @@ import path from 'path';
 
 class StorageService {
   constructor() {
-    this.baseStoragePath = '/home/storage/users';
+    this.baseStoragePath = '/home';
   }
 
   async initializeStorage() {
-    try {
-      // We don't need to create the base storage path anymore
-      // It's managed by the system user creation
-      return true;
-    } catch (error) {
-      console.error('Failed to initialize storage:', error);
-      throw new Error('Storage initialization failed');
-    }
+    // No initialization needed, system manages directories
+    return true;
   }
 
   getUserStoragePath(username) {
     return path.join(this.baseStoragePath, username);
-  }
-
-  async ensureUserStorage(username) {
-    // We don't need this anymore as the system creates the directory
-    return true;
   }
 
   async getUserStorageInfo(username) {
@@ -53,11 +42,6 @@ class StorageService {
       console.error(`Failed to list files for user ${username}:`, error);
       throw error;
     }
-  }
-
-  async deleteUserStorage(username) {
-    // We don't need this anymore as userdel -r handles cleanup
-    return true;
   }
 }
 
