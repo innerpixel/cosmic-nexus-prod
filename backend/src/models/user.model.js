@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 const userSchema = new mongoose.Schema({
   displayName: {
@@ -78,6 +79,10 @@ const userSchema = new mongoose.Schema({
     type: Date,
     select: false
   },
+  linuxUserCreated: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -85,6 +90,14 @@ const userSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  registrationExpires: {
+    type: Date,
+    default: () => new Date(Date.now() + 48 * 60 * 60 * 1000) // 48 hours to verify
+  },
+  isExpired: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

@@ -55,6 +55,9 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/cosmic-ne
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
+// Initialize cleanup cron job
+import './cron/cleanup.cron.js';
+
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

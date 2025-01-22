@@ -1,6 +1,7 @@
 import express from 'express';
 import User from '../models/user.model.js';
 import userSystemService from '../services/user-system.service.js';
+import cleanupService from '../services/cleanup.service.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -197,6 +198,70 @@ router.post('/users/:csmclName/verify', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to verify user',
+      details: error.message
+    });
+  }
+});
+
+// Trigger cleanup manually
+router.post('/cleanup', async (req, res) => {
+  console.log('Manually triggering cleanup...');
+  try {
+    const result = await cleanupService.cleanupExpiredUsers();
+    
+    res.json({
+      status: 'success',
+      message: 'Cleanup completed successfully',
+      data: {
+        expiredCount: result.expiredCount,
+        deletedCount: result.deletedCount
+      }
+    });
+  } catch (error) {
+    console.error('Manual cleanup error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to run cleanup',
+      details: error.message
+    });
+  }
+});
+
+// Get expired users
+router.get('/expired-users', async (req, res) => {
+  console.log('Listing expired users...');
+  try {
+    const expiredUsers = await User.find({
+      $or: [
+        {
+          registrationExpires: { $lt: new Date() },
+          $or: [
+            { isEmailVerified: false },
+            { isSimVerified: false }
+          ]
+        },
+        { isExpired: true }
+      ]
+    }, {
+      displayName: 1,
+      csmclName: 1,
+      regularEmail: 1,
+      isEmailVerified: 1,
+      isSimVerified: 1,
+      registrationExpires: 1,
+      createdAt: 1
+    });
+    
+    res.json({
+      status: 'success',
+      count: expiredUsers.length,
+      users: expiredUsers
+    });
+  } catch (error) {
+    console.error('List expired users error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to list expired users',
       details: error.message
     });
   }

@@ -1,9 +1,9 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import User from '../models/user.model.js';
-import notificationService from '../services/notification.service.js';
-import storageService from '../services/storage.service.js';
-import emailAccountService from '../services/email-account.service.js';
+import mailService from '../services/mail.service.js';
+import linuxUserService from '../services/linux-user.service.js';
+import cleanupService from '../services/cleanup.service.js';
 import crypto from 'crypto';
 
 // Helper function to generate tokens
@@ -26,80 +26,197 @@ const generateTokens = (userId) => {
 // Register new user
 export const register = async (req, res) => {
   try {
+    console.log('Registration attempt with data:', { 
+      ...req.body,
+      password: '[REDACTED]' 
+    });
+
     const { displayName, csmclName, regularEmail, simNumber, password } = req.body;
 
-    // Validate input
+    // Validate required fields
     if (!displayName || !csmclName || !regularEmail || !simNumber || !password) {
+      console.error('Missing required fields:', {
+        hasDisplayName: !!displayName,
+        hasCsmclName: !!csmclName,
+        hasRegularEmail: !!regularEmail,
+        hasSimNumber: !!simNumber,
+        hasPassword: !!password
+      });
       return res.status(400).json({
         status: 'error',
         message: 'All fields are required'
       });
     }
 
-    // Check if user already exists
+    // Check if user already exists with either email
+    console.log('Checking for existing user...');
     const existingUser = await User.findOne({
       $or: [
         { regularEmail },
-        { csmclName },
-        { simNumber }
+        { csmclName }
       ]
     });
 
     if (existingUser) {
+      console.log('User already exists:', existingUser.regularEmail === regularEmail ? 'Email taken' : 'CSMCL name taken');
       return res.status(400).json({
         status: 'error',
-        message: 'User already exists with this email, CSMCL name, or SIM number'
+        message: existingUser.regularEmail === regularEmail 
+          ? 'Email already registered' 
+          : 'CSMCL name already taken'
       });
     }
 
-    // Create verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // Check if Linux user already exists
+    const linuxUserExists = await linuxUserService.userExists(csmclName);
+    if (linuxUserExists) {
+      console.log('Linux user already exists:', csmclName);
+      return res.status(400).json({
+        status: 'error',
+        message: 'Username already taken'
+      });
+    }
 
-    // Create user
+    // Create new user in MongoDB
+    console.log('Creating new user...');
     const user = new User({
       displayName,
       csmclName,
       regularEmail,
       simNumber,
-      password: hashedPassword,
-      verificationToken,
-      verificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+      password,
+      cosmicalEmail: `${csmclName}@cosmical.me`
     });
 
-    await user.save();
+    // Generate verification tokens
+    console.log('Generating verification token...');
+    const emailToken = crypto.randomBytes(32).toString('hex');
+    user.emailVerificationToken = emailToken;
+    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Create local Unix user in development mode
-    if (process.env.NODE_ENV === 'development') {
+    try {
+      // Save user first
+      console.log('Saving user to database...');
+      await user.save();
+      console.log('User saved successfully');
+
+      // Send verification email
+      console.log('Sending verification email...');
+      await mailService.sendVerificationEmail(user.regularEmail, emailToken);
+      console.log('Verification email sent successfully');
+
+      // Return success response
+      return res.status(201).json({
+        status: 'success',
+        message: 'Registration successful. Please check your email for verification instructions.',
+        data: {
+          user: {
+            _id: user._id,
+            displayName: user.displayName,
+            csmclName: user.csmclName,
+            regularEmail: user.regularEmail,
+            cosmicalEmail: user.cosmicalEmail
+          }
+        }
+      });
+    } catch (error) {
+      // If anything fails, clean up
+      console.error('Error in final steps:', error);
+      if (user._id) {
+        await User.findByIdAndDelete(user._id);
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('Registration error:', error);
+    if (error.name === 'ValidationError') {
+      console.error('Validation errors:', Object.keys(error.errors).map(key => ({
+        field: key,
+        message: error.errors[key].message
+      })));
+      return res.status(400).json({
+        status: 'error',
+        message: 'Validation failed',
+        errors: Object.keys(error.errors).map(key => ({
+          field: key,
+          message: error.errors[key].message
+        }))
+      });
+    }
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while registering',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Verify email
+export const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    const user = await User.findOne({
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      console.error('Invalid or expired verification token:', { token });
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid or expired verification token'
+      });
+    }
+
+    // Check if registration period expired
+    if (await cleanupService.isUserExpired(user._id)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Registration period has expired. Please register again.'
+      });
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+
+    // If both email and phone are verified, create Linux user
+    if (user.isSimVerified && !user.linuxUserCreated) {
       try {
-        await emailAccountService.createLocalUser(csmclName, password);
-        console.log(`Local Unix user ${csmclName} created successfully`);
+        await linuxUserService.createUser(user.csmclName, user.password);
+        user.linuxUserCreated = true;
       } catch (error) {
-        console.error('Failed to create local Unix user:', error);
-        // Don't fail registration if local user creation fails
+        console.error('Failed to create Linux user:', error);
+        return res.status(500).json({
+          status: 'error',
+          message: 'Failed to create system account'
+        });
       }
     }
 
-    // Send verification email
-    try {
-      await emailAccountService.sendVerificationEmail(user, verificationToken);
-    } catch (error) {
-      console.error('Failed to send verification email:', error);
-      // Don't fail registration if email fails
-    }
+    await user.save();
 
-    res.status(201).json({
+    return res.status(200).json({
       status: 'success',
-      message: 'User registered successfully. Please check your email for verification.'
+      message: 'Email verified successfully',
+      data: {
+        user: {
+          _id: user._id,
+          displayName: user.displayName,
+          csmclName: user.csmclName,
+          regularEmail: user.regularEmail,
+          isEmailVerified: user.isEmailVerified,
+          isSimVerified: user.isSimVerified,
+          linuxUserCreated: user.linuxUserCreated
+        }
+      }
     });
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
+    console.error('Email verification error:', error);
+    return res.status(500).json({
       status: 'error',
-      message: 'Failed to register user'
+      message: 'An error occurred while verifying email'
     });
   }
 };
@@ -180,8 +297,7 @@ export const login = async (req, res) => {
           cosmicalEmail: user.cosmicalEmail,
           isEmailVerified: user.isEmailVerified,
           isSimVerified: user.isSimVerified,
-          mailAccountCreated: user.mailAccountCreated,
-          homeDirCreated: user.homeDirCreated
+          linuxUserCreated: user.linuxUserCreated
         },
         accessToken
       }
@@ -191,50 +307,6 @@ export const login = async (req, res) => {
     return res.status(500).json({
       status: 'error',
       message: 'An error occurred while logging in'
-    });
-  }
-};
-
-// Verify email
-export const verifyEmail = async (req, res) => {
-  try {
-    const { token } = req.body;
-
-    if (!token) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Verification token is required'
-      });
-    }
-
-    // Find user with matching token and token not expired
-    const user = await User.findOne({
-      verificationToken: token,
-      verificationExpires: { $gt: Date.now() }
-    });
-
-    if (!user) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid or expired verification token'
-      });
-    }
-
-    // Mark email as verified and clear verification token
-    user.isEmailVerified = true;
-    user.verificationToken = undefined;
-    user.verificationExpires = undefined;
-    await user.save();
-
-    res.json({
-      status: 'success',
-      message: 'Email verified successfully'
-    });
-  } catch (error) {
-    console.error('Email verification error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to verify email'
     });
   }
 };
@@ -261,11 +333,37 @@ export const verifyPhone = async (req, res) => {
     user.isSimVerified = true;
     user.simVerificationCode = undefined;
     user.simVerificationExpires = undefined;
+
+    // If both email and phone are verified, create Linux user
+    if (user.isEmailVerified && !user.linuxUserCreated) {
+      try {
+        await linuxUserService.createUser(user.csmclName, user.password);
+        user.linuxUserCreated = true;
+      } catch (error) {
+        console.error('Failed to create Linux user:', error);
+        return res.status(500).json({
+          status: 'error',
+          message: 'Failed to create system account'
+        });
+      }
+    }
+
     await user.save();
 
     return res.status(200).json({
       status: 'success',
-      message: 'Phone number verified successfully'
+      message: 'Phone number verified successfully',
+      data: {
+        user: {
+          _id: user._id,
+          displayName: user.displayName,
+          csmclName: user.csmclName,
+          regularEmail: user.regularEmail,
+          isEmailVerified: user.isEmailVerified,
+          isSimVerified: user.isSimVerified,
+          linuxUserCreated: user.linuxUserCreated
+        }
+      }
     });
   } catch (error) {
     console.error('Phone verification error:', error);
@@ -293,7 +391,7 @@ export const forgotPassword = async (req, res) => {
     const resetToken = user.generatePasswordResetToken();
     await user.save();
 
-    await notificationService.sendPasswordResetEmail(email, resetToken);
+    await mailService.sendPasswordResetEmail(email, resetToken);
 
     res.json({
       status: 'success',
@@ -476,7 +574,7 @@ export const resendVerificationEmail = async (req, res) => {
     console.log('Generated new verification token for:', email);
 
     // Send verification email
-    await emailAccountService.sendVerificationEmail(user.regularEmail, emailToken, user.displayName);
+    await mailService.sendVerificationEmail(user.regularEmail, emailToken, user.displayName);
     console.log('Sent verification email to:', email);
 
     return res.status(200).json({
