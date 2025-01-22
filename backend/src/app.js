@@ -1,23 +1,53 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ path: process.env.NODE_ENV === 'development' ? '.env.development' : '.env' });
 
 const app = express();
 
 // Middleware
+app.use(helmet({
+  contentSecurityPolicy: false // Disable for development
+}));
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Debug middleware
+app.use((req, res, next) => {
+  console.log('Request:', {
+    method: req.method,
+    path: req.path,
+    body: req.body,
+    headers: req.headers
+  });
+  next();
+});
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling
+app.use((req, res, next) => {
+  res.status(404).json({
+    status: 'error',
+    message: `Cannot ${req.method} ${req.path}`
+  });
+});
+
 app.use(errorHandler);
 
 // Database connection

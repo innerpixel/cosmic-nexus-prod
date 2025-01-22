@@ -1,43 +1,21 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import nodemailer from 'nodemailer';
 import crypto from 'crypto';
-import pkg from 'ethereal-email';
-const { createTestAccount, createTransport } = pkg;
+import emailAccountService from '../services/email-account.service.js';
 import storageService from '../services/storage.service.js';
 import User from '../models/user.model.js';
 
 const router = express.Router();
 
-// Create Ethereal test account for development
-let testAccount = null;
-let transporter = null;
-
-async function setupEtherealEmail() {
-  if (!testAccount) {
-    testAccount = await createTestAccount();
-    console.log('Created Ethereal test account:', testAccount.user);
-    
-    transporter = createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      },
-    });
-  }
-  return transporter;
-}
-
 // Register endpoint
 router.post('/register', async (req, res) => {
   try {
     const { displayName, csmclName, simNumber, password, regularEmail } = req.body;
+    console.log('Registration attempt for:', { displayName, csmclName, regularEmail });
     
     // Basic validation
     if (!displayName || !csmclName || !simNumber || !password || !regularEmail) {
+      console.log('Validation failed - missing fields');
       return res.status(400).json({ 
         status: 'error',
         message: 'All fields are required' 
@@ -50,6 +28,7 @@ router.post('/register', async (req, res) => {
     });
     
     if (existingUser) {
+      console.log('User already exists in MongoDB:', existingUser.csmclName);
       return res.status(400).json({ 
         status: 'error',
         message: 'User already exists' 
@@ -59,10 +38,12 @@ router.post('/register', async (req, res) => {
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+    console.log('Password hashed successfully');
     
     // Generate verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    console.log('Generated verification token');
     
     // Create user
     const user = new User({
@@ -78,41 +59,37 @@ router.post('/register', async (req, res) => {
     
     // Save user to database
     await user.save();
+    console.log('User saved to MongoDB successfully');
     
-    // Setup Ethereal email for testing
-    const emailTransporter = await setupEtherealEmail();
-    
-    // Send verification email
-    const info = await emailTransporter.sendMail({
-      from: '"Cosmic Nexus Test" <test@ethereal.email>',
-      to: regularEmail,
-      subject: 'Verify your email - Cosmic Nexus',
-      text: `Welcome ${displayName}! Please verify your email using this token: ${verificationToken}\nOr click this link: ${process.env.FRONTEND_URL}/verify-email/${verificationToken}`,
-      html: `
-        <h1>Welcome ${displayName}!</h1>
-        <p>Please verify your email by either:</p>
-        <p>1. Using this token: <strong>${verificationToken}</strong></p>
-        <p>2. Clicking this link: <a href="${process.env.FRONTEND_URL}/verify-email/${verificationToken}">Verify Email</a></p>
-      `,
-    });
-    
-    console.log('Verification email sent:', info);
-    console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
-    
-    // Create user storage folders
-    await storageService.createUserFolders(csmclName);
-    
-    res.status(201).json({ 
-      status: 'success',
-      message: 'User registered successfully. Please check your email for verification.',
-      emailPreview: nodemailer.getTestMessageUrl(info)
-    });
-    
+    try {
+      // Create system user
+      await emailAccountService.createEmailAccount(csmclName, password);
+      console.log('System user created successfully');
+      
+      // Try to send verification email, but don't fail if it doesn't work
+      try {
+        await emailAccountService.sendVerificationEmail(user, verificationToken);
+        console.log('Verification email sent');
+      } catch (emailError) {
+        console.warn('Could not send verification email:', emailError.message);
+      }
+      
+      res.status(201).json({
+        status: 'success',
+        message: 'Registration successful. Please check your email for verification.',
+        verificationToken // Only in development
+      });
+    } catch (systemError) {
+      // If system user creation fails, delete the MongoDB user
+      await User.deleteOne({ _id: user._id });
+      throw new Error(`Failed to create system user: ${systemError.message}`);
+    }
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ 
       status: 'error',
-      message: 'Registration failed' 
+      message: 'Registration failed',
+      details: error.message 
     });
   }
 });
@@ -160,6 +137,16 @@ router.post('/verify-email', async (req, res) => {
     user.verificationExpires = undefined;
     await user.save();
 
+    // Create user storage folders after verification
+    try {
+      await storageService.createUserFolders(user.csmclName);
+      console.log(`Storage folders created for user: ${user.csmclName}`);
+    } catch (error) {
+      console.error(`Failed to create storage for ${user.csmclName}:`, error);
+      // Continue with verification success even if storage creation fails
+      // We can implement a retry mechanism later
+    }
+
     res.json({ 
       status: 'success',
       message: 'Email verified successfully' 
@@ -199,6 +186,16 @@ router.get('/verify-email/:token', async (req, res) => {
     user.verificationToken = undefined;
     user.verificationExpires = undefined;
     await user.save();
+
+    // Create user storage folders after verification
+    try {
+      await storageService.createUserFolders(user.csmclName);
+      console.log(`Storage folders created for user: ${user.csmclName}`);
+    } catch (error) {
+      console.error(`Failed to create storage for ${user.csmclName}:`, error);
+      // Continue with verification success even if storage creation fails
+      // We can implement a retry mechanism later
+    }
 
     res.redirect('/verify-email?status=success');
   } catch (error) {
@@ -245,31 +242,13 @@ router.post('/resend-verification', async (req, res) => {
     user.verificationExpires = verificationExpires;
     await user.save();
 
-    // Setup Ethereal email for testing
-    const emailTransporter = await setupEtherealEmail();
-    
     // Send new verification email
-    const info = await emailTransporter.sendMail({
-      from: '"Cosmic Nexus Test" <test@ethereal.email>',
-      to: user.regularEmail,
-      subject: 'New Verification Token - Cosmic Nexus',
-      text: `Hello ${user.displayName}! Here's your new verification token: ${verificationToken}`,
-      html: `
-        <h1>Hello ${user.displayName}!</h1>
-        <p>You requested a new verification token. Here it is:</p>
-        <p><strong>${verificationToken}</strong></p>
-        <p>You can also click this link to verify your email:</p>
-        <p><a href="${process.env.FRONTEND_URL}/verify-email/${verificationToken}">Verify Email</a></p>
-      `,
-    });
-    
-    console.log('New verification email sent:', info);
-    console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+    await emailAccountService.sendVerificationEmail(user, verificationToken);
+    console.log('New verification email sent');
 
     res.json({
       status: 'success',
-      message: 'New verification token sent. Please check your email.',
-      emailPreview: nodemailer.getTestMessageUrl(info)
+      message: 'New verification token sent. Please check your email.'
     });
 
   } catch (error) {

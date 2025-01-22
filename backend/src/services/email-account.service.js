@@ -1,39 +1,25 @@
 import nodemailer from 'nodemailer';
-import { mailConfig } from '../config/mail.config.js';
+import userSystemService from './user-system.service.js';
 
 class EmailAccountService {
   constructor() {
     this.initialized = false;
-    this.isDevelopment = process.env.NODE_ENV === 'development';
-    this.transporter = null;
   }
 
   async ensureInitialized() {
     if (this.initialized) return;
     
     try {
-      if (this.isDevelopment) {
-        // In development, create an Ethereal test account
-        const testAccount = await nodemailer.createTestAccount();
-        console.log('Created Ethereal test account:', testAccount.user);
-        
-        this.transporter = nodemailer.createTransport({
-          host: 'smtp.ethereal.email',
-          port: 587,
-          secure: false,
-          auth: {
-            user: testAccount.user,
-            pass: testAccount.pass
-          }
-        });
-        
-        console.log('Development mail transport initialized (using Ethereal)');
-        this.initialized = true;
-        return;
-      }
-      
-      // Production: Create transporter with config
-      this.transporter = nodemailer.createTransport(mailConfig.smtp);
+      // Create transporter with config
+      this.transporter = nodemailer.createTransport({
+        host: process.env.MAIL_HOST,
+        port: parseInt(process.env.MAIL_PORT),
+        secure: process.env.MAIL_SECURE === 'true',
+        auth: {
+          user: process.env.MAIL_USER,
+          pass: process.env.MAIL_PASSWORD
+        }
+      });
       
       // Verify connection
       await this.transporter.verify();
@@ -42,8 +28,8 @@ class EmailAccountService {
       
       // Log mail configuration
       console.log('Initializing email configuration with:', {
-        host: mailConfig.smtp.host,
-        port: mailConfig.smtp.port,
+        host: process.env.MAIL_HOST,
+        port: process.env.MAIL_PORT,
         from: process.env.MAIL_FROM
       });
     } catch (error) {
@@ -53,99 +39,15 @@ class EmailAccountService {
   }
 
   async checkEmailAccount(username) {
-    try {
-      if (this.isDevelopment) {
-        // In development, check if local Unix user exists
-        const { exec } = await import('child_process');
-        const util = await import('util');
-        const execAsync = util.promisify(exec);
-
-        try {
-          await execAsync(`id ${username}`);
-          return true; // User exists
-        } catch (error) {
-          return false; // User doesn't exist
-        }
-      }
-
-      // In production, check if email account exists on mail server
-      const email = `${username}@${mailConfig.domain}`;
-      
-      // Add your production mail server account check logic here
-      // This might involve API calls to your mail server or other methods
-      
-      return false;
-    } catch (error) {
-      console.error('Error checking email account:', error);
-      throw error;
-    }
+    return await userSystemService.checkSystemUser(username);
   }
 
   async createEmailAccount(username, password) {
-    try {
-      if (this.isDevelopment) {
-        // In development, create a local Unix user
-        const { exec } = await import('child_process');
-        const util = await import('util');
-        const execAsync = util.promisify(exec);
-
-        try {
-          // Create user with home directory
-          await execAsync(`sudo useradd -m -s /bin/bash ${username}`);
-          
-          // Set user password (using chpasswd)
-          await execAsync(`echo "${username}:${password}" | sudo chpasswd`);
-          
-          console.log(`Local Unix user ${username} created successfully`);
-          return true;
-        } catch (error) {
-          console.error('Error creating local Unix user:', error);
-          return false;
-        }
-      }
-
-      // In production, create email account on mail server
-      const email = `${username}@${mailConfig.domain}`;
-      
-      // Add your production mail server account creation logic here
-      // This might involve API calls to your mail server or other methods
-      
-      return true;
-    } catch (error) {
-      console.error('Error creating email account:', error);
-      throw error;
-    }
+    return await userSystemService.createSystemUser(username, password);
   }
 
   async deleteEmailAccount(username) {
-    try {
-      if (this.isDevelopment) {
-        // In development, delete local Unix user
-        const { exec } = await import('child_process');
-        const util = await import('util');
-        const execAsync = util.promisify(exec);
-
-        try {
-          await execAsync(`sudo userdel -r ${username}`);
-          console.log(`Local Unix user ${username} deleted successfully`);
-          return true;
-        } catch (error) {
-          console.error('Error deleting local Unix user:', error);
-          return false;
-        }
-      }
-
-      // In production, delete email account on mail server
-      const email = `${username}@${mailConfig.domain}`;
-      
-      // Add your production mail server account deletion logic here
-      // This might involve API calls to your mail server or other methods
-      
-      return true;
-    } catch (error) {
-      console.error('Error deleting email account:', error);
-      throw error;
-    }
+    return await userSystemService.deleteSystemUser(username);
   }
 
   async sendVerificationEmail(user, verificationToken) {
@@ -174,11 +76,9 @@ class EmailAccountService {
       console.log('Verification email sent:', info.messageId);
       
       // If we're in development mode using Ethereal, log the preview URL
-      if (this.isDevelopment) {
-        const previewUrl = nodemailer.getTestMessageUrl(info);
-        console.log('Preview URL:', previewUrl);
-        console.log('Verification token:', verificationToken);  // Log the token for easy testing
-      }
+      // const previewUrl = nodemailer.getTestMessageUrl(info);
+      // console.log('Preview URL:', previewUrl);
+      console.log('Verification token:', verificationToken);  // Log the token for easy testing
 
       return true;
     } catch (error) {
@@ -189,7 +89,7 @@ class EmailAccountService {
 
   async sendWelcomeEmail(to, name) {
     const mailOptions = {
-      from: process.env.MAIL_FROM || `noreply@${mailConfig.domain}`,
+      from: process.env.MAIL_FROM || `noreply@${process.env.MAIL_HOST}`,
       to: to,
       subject: 'Welcome to Cosmic Nexus!',
       text: `Welcome ${name}! Your account has been created successfully.`
