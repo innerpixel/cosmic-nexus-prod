@@ -13,16 +13,18 @@ class UserSystemService {
     try {
       console.log(`Creating system user: ${username}`);
       
-      // Create user and set password in one command to avoid race conditions
-      const createUserCmd = `/usr/sbin/useradd -m -g ${this.userGroup} -s ${this.defaultShell} ${username}`;
-      const setPasswdCmd = `echo "${username}:${password}" | /usr/bin/chpasswd`;
+      // Execute commands separately to match our NOPASSWD sudoers entries
+      await execAsync(`sudo /usr/sbin/useradd -m -g ${this.userGroup} -s ${this.defaultShell} ${username}`);
+      console.log('User created, setting password...');
       
-      await execAsync(`sudo ${createUserCmd} && sudo ${setPasswdCmd}`);
+      await execAsync(`echo "${username}:${password}" | sudo /usr/bin/chpasswd`);
+      console.log('Password set successfully...');
       
-      // Create mail directory structure
-      await execAsync(`sudo mkdir -p /home/${username}/Maildir/{new,cur,tmp}`);
-      await execAsync(`sudo chown -R ${username}:${this.userGroup} /home/${username}/Maildir`);
-      await execAsync(`sudo chmod -R 700 /home/${username}/Maildir`);
+      // Create mail directory structure in user's home
+      await execAsync(`mkdir -p /home/${username}/Maildir/{new,cur,tmp}`);
+      await execAsync(`sudo /usr/sbin/usermod -g ${this.userGroup} ${username}`);
+      await execAsync(`chown -R ${username}:${this.userGroup} /home/${username}/Maildir`);
+      await execAsync(`chmod -R 700 /home/${username}/Maildir`);
       
       // Set quota only in production
       if (!this.isDevelopment) {
@@ -41,11 +43,13 @@ class UserSystemService {
     try {
       console.log(`Deleting system user: ${username}`);
       
-      // Remove user and their home directory
+      // Remove user and their home directory using NOPASSWD command
       await execAsync(`sudo /usr/sbin/userdel -r ${username}`);
       
       // Clean up any remaining files
-      await execAsync(`sudo rm -rf /var/spool/mail/${username}`);
+      if (await this.fileExists(`/var/spool/mail/${username}`)) {
+        await execAsync(`rm -rf /var/spool/mail/${username}`);
+      }
       
       console.log(`System user ${username} deleted successfully`);
       return true;
@@ -80,6 +84,15 @@ class UserSystemService {
     } catch (error) {
       console.error('Error setting user quota:', error);
       throw error;
+    }
+  }
+
+  async fileExists(path) {
+    try {
+      await execAsync(`test -f ${path}`);
+      return true;
+    } catch {
+      return false;
     }
   }
 }
