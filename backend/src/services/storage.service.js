@@ -1,65 +1,63 @@
-import fs from 'fs/promises';
+import { promises as fs } from 'fs';
 import path from 'path';
 
 class StorageService {
   constructor() {
-    // Get storage path from environment
-    this.storagePath = process.env.STORAGE_PATH || path.join(process.cwd(), 'storage', 'dev');
-    this.initializeStorage();
+    this.baseStoragePath = '/home/storage/users';
   }
 
   async initializeStorage() {
     try {
-      // Create base storage directories if they don't exist
-      await fs.mkdir(path.join(this.storagePath, 'users'), { recursive: true });
-      console.log('Storage initialized at:', this.storagePath);
+      // We don't need to create the base storage path anymore
+      // It's managed by the system user creation
+      return true;
     } catch (error) {
       console.error('Failed to initialize storage:', error);
       throw new Error('Storage initialization failed');
     }
   }
 
-  async createUserFolders(csmclName) {
-    console.log(`Creating storage folders for user: ${csmclName}`);
-    
+  getUserStoragePath(username) {
+    return path.join(this.baseStoragePath, username);
+  }
+
+  async ensureUserStorage(username) {
+    // We don't need this anymore as the system creates the directory
+    return true;
+  }
+
+  async getUserStorageInfo(username) {
     try {
-      const userRoot = path.join(this.storagePath, 'users', csmclName);
-      
-      // Create user directories
-      await fs.mkdir(path.join(userRoot, 'public'), { recursive: true });
-      await fs.mkdir(path.join(userRoot, 'private'), { recursive: true });
-      
-      // Create subdirectories
-      const directories = {
-        public: ['photos', 'documents', 'shared'],
-        private: ['backups', 'settings', 'mail']
+      const userPath = this.getUserStoragePath(username);
+      const stats = await fs.stat(userPath);
+      return {
+        exists: true,
+        size: stats.size,
+        created: stats.birthtime,
+        modified: stats.mtime
       };
-
-      for (const [type, folders] of Object.entries(directories)) {
-        for (const folder of folders) {
-          await fs.mkdir(path.join(userRoot, type, folder), { recursive: true });
-        }
-      }
-
-      return userRoot;
     } catch (error) {
-      console.error(`Failed to create user folders for ${csmclName}:`, error);
+      if (error.code === 'ENOENT') {
+        return { exists: false };
+      }
       throw error;
     }
   }
 
-  async deleteUserFolders(csmclName) {
-    console.log(`Deleting storage folders for user: ${csmclName}`);
-    
+  async listUserFiles(username) {
     try {
-      const userRoot = path.join(this.storagePath, 'users', csmclName);
-      await fs.rm(userRoot, { recursive: true, force: true });
-      console.log(`Storage folders deleted for ${csmclName}`);
-      return true;
+      const userPath = this.getUserStoragePath(username);
+      const files = await fs.readdir(userPath);
+      return files;
     } catch (error) {
-      console.error(`Failed to delete storage for user ${csmclName}:`, error);
-      throw new Error('Failed to delete user storage');
+      console.error(`Failed to list files for user ${username}:`, error);
+      throw error;
     }
+  }
+
+  async deleteUserStorage(username) {
+    // We don't need this anymore as userdel -r handles cleanup
+    return true;
   }
 }
 

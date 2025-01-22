@@ -2,7 +2,6 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import emailAccountService from '../services/email-account.service.js';
-import storageService from '../services/storage.service.js';
 import User from '../models/user.model.js';
 
 const router = express.Router();
@@ -62,9 +61,9 @@ router.post('/register', async (req, res) => {
     console.log('User saved to MongoDB successfully');
     
     try {
-      // Create system user
+      // Create system user and email account
       await emailAccountService.createEmailAccount(csmclName, password);
-      console.log('System user created successfully');
+      console.log('System user and email account created successfully');
       
       // Try to send verification email, but don't fail if it doesn't work
       try {
@@ -137,16 +136,6 @@ router.post('/verify-email', async (req, res) => {
     user.verificationExpires = undefined;
     await user.save();
 
-    // Create user storage folders after verification
-    try {
-      await storageService.createUserFolders(user.csmclName);
-      console.log(`Storage folders created for user: ${user.csmclName}`);
-    } catch (error) {
-      console.error(`Failed to create storage for ${user.csmclName}:`, error);
-      // Continue with verification success even if storage creation fails
-      // We can implement a retry mechanism later
-    }
-
     res.json({ 
       status: 'success',
       message: 'Email verified successfully' 
@@ -186,16 +175,6 @@ router.get('/verify-email/:token', async (req, res) => {
     user.verificationToken = undefined;
     user.verificationExpires = undefined;
     await user.save();
-
-    // Create user storage folders after verification
-    try {
-      await storageService.createUserFolders(user.csmclName);
-      console.log(`Storage folders created for user: ${user.csmclName}`);
-    } catch (error) {
-      console.error(`Failed to create storage for ${user.csmclName}:`, error);
-      // Continue with verification success even if storage creation fails
-      // We can implement a retry mechanism later
-    }
 
     res.redirect('/verify-email?status=success');
   } catch (error) {
@@ -274,9 +253,6 @@ router.delete('/user/:csmclName', async (req, res) => {
       });
     }
 
-    // Delete user's storage folders
-    await storageService.deleteUserFolders(csmclName);
-    
     // Delete user from database
     await User.deleteOne({ csmclName });
 

@@ -68,8 +68,12 @@ class UserSystemService {
       console.log(`System user ${username} deleted successfully`);
       return true;
     } catch (error) {
-      console.error('Error deleting system user:', error);
-      throw error;
+      if (error.message.includes('user does not exist')) {
+        console.warn(`User ${username} does not exist in system, skipping deletion`);
+        return true;
+      }
+      console.error('Failed to delete system user:', error);
+      throw new Error(`Failed to delete system user: ${error.message}`);
     }
   }
 

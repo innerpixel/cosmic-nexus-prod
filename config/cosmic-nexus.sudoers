@@ -1,0 +1,5 @@
+# Allow nginx to manage users without password for specific commands
+nginx ALL=(ALL) NOPASSWD: /usr/sbin/useradd -m -g csmcl -s /bin/bash *
+nginx ALL=(ALL) NOPASSWD: /usr/sbin/userdel -r *
+nginx ALL=(ALL) NOPASSWD: /usr/sbin/usermod -g csmcl *
+nginx ALL=(ALL) NOPASSWD: /usr/bin/chpasswd
