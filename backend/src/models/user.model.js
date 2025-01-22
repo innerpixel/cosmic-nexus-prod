@@ -29,8 +29,8 @@ const userSchema = new mongoose.Schema({
   },
   cosmicalEmail: {
     type: String,
-    required: [true, 'Cosmical email is required'],
     unique: true,
+    sparse: true,
     trim: true,
     lowercase: true
   },

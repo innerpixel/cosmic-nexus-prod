@@ -4,7 +4,10 @@ export const mailConfig = {
     host: process.env.MAIL_HOST || (process.env.NODE_ENV === 'development' ? 'smtp.ethereal.email' : 'mail.cosmical.me'),
     port: parseInt(process.env.MAIL_PORT) || (process.env.NODE_ENV === 'development' ? 587 : 25),
     secure: process.env.MAIL_SECURE === 'true',
-    auth: {
+    auth: process.env.NODE_ENV === 'development' ? {
+      user: 'your.ethereal.email@ethereal.email',  // We'll get these credentials in a moment
+      pass: 'your.ethereal.password'
+    } : {
       user: process.env.MAIL_USER,
       pass: process.env.MAIL_PASS || process.env.MAIL_PASSWORD
     },

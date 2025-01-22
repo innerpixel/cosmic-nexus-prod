@@ -1,3 +1,4 @@
+import dotenv from 'dotenv';
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -6,6 +7,19 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import authRoutes from './routes/auth.routes.js';
 import testRoutes from './routes/test.routes.js';
+
+// Load environment variables based on NODE_ENV
+const envFile = process.env.NODE_ENV === 'development' ? '.env.development' : '.env';
+dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+
+// Debug environment
+console.log('Environment:', {
+  NODE_ENV: process.env.NODE_ENV,
+  MAIL_HOST: process.env.MAIL_HOST,
+  MAIL_PORT: process.env.MAIL_PORT,
+  MAIL_USER: process.env.MAIL_USER,
+  MAIL_FROM: process.env.MAIL_FROM
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,6 +37,17 @@ app.use(cors({
 // Body parser
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log('Request:', {
+    method: req.method,
+    path: req.path,
+    body: req.body,
+    headers: req.headers
+  });
+  next();
+});
 
 // Routes
 app.use('/api/auth', authRoutes);

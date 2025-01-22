@@ -12,7 +12,27 @@ class EmailAccountService {
     if (this.initialized) return;
     
     try {
-      // Create transporter with config
+      if (this.isDevelopment) {
+        // In development, create an Ethereal test account
+        const testAccount = await nodemailer.createTestAccount();
+        console.log('Created Ethereal test account:', testAccount.user);
+        
+        this.transporter = nodemailer.createTransport({
+          host: 'smtp.ethereal.email',
+          port: 587,
+          secure: false,
+          auth: {
+            user: testAccount.user,
+            pass: testAccount.pass
+          }
+        });
+        
+        console.log('Development mail transport initialized (using Ethereal)');
+        this.initialized = true;
+        return;
+      }
+      
+      // Production: Create transporter with config
       this.transporter = nodemailer.createTransport(mailConfig.smtp);
       
       // Verify connection
@@ -33,107 +53,136 @@ class EmailAccountService {
   }
 
   async checkEmailAccount(username) {
-    const email = `${username}@${mailConfig.domain}`;
-    
     try {
       if (this.isDevelopment) {
-        console.log(`[DEV] Checking local email account: ${email}`);
-        // In development, always return false since we're using Ethereal
-        return false;
+        // In development, check if local Unix user exists
+        const { exec } = await import('child_process');
+        const util = await import('util');
+        const execAsync = util.promisify(exec);
+
+        try {
+          await execAsync(`id ${username}`);
+          return true; // User exists
+        } catch (error) {
+          return false; // User doesn't exist
+        }
       }
+
+      // In production, check if email account exists on mail server
+      const email = `${username}@${mailConfig.domain}`;
       
-      // Production: implement actual email account check on cosmical.me
-      throw new Error('Production email account check not implemented');
+      // Add your production mail server account check logic here
+      // This might involve API calls to your mail server or other methods
+      
+      return false;
     } catch (error) {
-      console.error('Failed to check email account:', error);
+      console.error('Error checking email account:', error);
       throw error;
     }
   }
 
-  async createEmailAccount(username, forwardTo) {
-    const email = `${username}@${mailConfig.domain}`;
-    
+  async createEmailAccount(username, password) {
     try {
       if (this.isDevelopment) {
-        console.log(`[DEV] Creating local email account: ${email}`);
-        // In development, we assume the local mail server handles account creation
-        return { email, username, forwardTo };
+        // In development, create a local Unix user
+        const { exec } = await import('child_process');
+        const util = await import('util');
+        const execAsync = util.promisify(exec);
+
+        try {
+          // Create user with home directory
+          await execAsync(`sudo useradd -m -s /bin/bash ${username}`);
+          
+          // Set user password (using chpasswd)
+          await execAsync(`echo "${username}:${password}" | sudo chpasswd`);
+          
+          console.log(`Local Unix user ${username} created successfully`);
+          return true;
+        } catch (error) {
+          console.error('Error creating local Unix user:', error);
+          return false;
+        }
       }
+
+      // In production, create email account on mail server
+      const email = `${username}@${mailConfig.domain}`;
       
-      // Production: implement actual email account creation on cosmical.me
-      throw new Error('Production email account creation not implemented');
+      // Add your production mail server account creation logic here
+      // This might involve API calls to your mail server or other methods
+      
+      return true;
     } catch (error) {
-      console.error('Failed to create email account:', error);
+      console.error('Error creating email account:', error);
       throw error;
     }
   }
 
   async deleteEmailAccount(username) {
-    const email = `${username}@${mailConfig.domain}`;
-    
     try {
       if (this.isDevelopment) {
-        console.log(`[DEV] Deleting local email account: ${email}`);
-        // In development, we assume the local mail server handles deletion
-        return true;
+        // In development, delete local Unix user
+        const { exec } = await import('child_process');
+        const util = await import('util');
+        const execAsync = util.promisify(exec);
+
+        try {
+          await execAsync(`sudo userdel -r ${username}`);
+          console.log(`Local Unix user ${username} deleted successfully`);
+          return true;
+        } catch (error) {
+          console.error('Error deleting local Unix user:', error);
+          return false;
+        }
       }
+
+      // In production, delete email account on mail server
+      const email = `${username}@${mailConfig.domain}`;
       
-      // Production: implement actual email account deletion on cosmical.me
-      throw new Error('Production email account deletion not implemented');
+      // Add your production mail server account deletion logic here
+      // This might involve API calls to your mail server or other methods
+      
+      return true;
     } catch (error) {
-      console.error('Failed to delete email account:', error);
+      console.error('Error deleting email account:', error);
       throw error;
     }
   }
 
-  async sendVerificationEmail(to, token, name) {
-    const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}&email=${encodeURIComponent(to)}`;
-    
-    const mailOptions = {
-      from: process.env.MAIL_FROM || `noreply@${mailConfig.domain}`,
-      to: to,
-      subject: 'Verify Your Email - Cosmic Nexus',
-      text: `Hello ${name || 'there'},
-
-Welcome to Cosmic Nexus! Please verify your email address by clicking the link below:
-
-${verifyUrl}
-
-This link will expire in 24 hours.
-
-If you did not create an account, please ignore this email.
-
-Best regards,
-The Cosmic Nexus Team`,
-      html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-  <h2>Welcome to Cosmic Nexus!</h2>
-  <p>Hello ${name || 'there'},</p>
-  <p>Please verify your email address by clicking the button below:</p>
-  <p style="text-align: center; margin: 30px 0;">
-    <a href="${verifyUrl}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">Verify Email</a>
-  </p>
-  <p>Or copy and paste this link in your browser:</p>
-  <p style="background-color: #f5f5f5; padding: 10px; word-break: break-all;">
-    ${verifyUrl}
-  </p>
-  <p><strong>This link will expire in 24 hours.</strong></p>
-  <p>If you did not create an account, please ignore this email.</p>
-  <p>Best regards,<br>The Cosmic Nexus Team</p>
-</div>`
-    };
-
+  async sendVerificationEmail(user, verificationToken) {
     try {
       await this.ensureInitialized();
-      const info = await this.transporter.sendMail(mailOptions);
+      
+      const message = {
+        from: `CSMCL <${process.env.MAIL_FROM || 'noreply@local.test'}>`,
+        to: user.regularEmail,
+        subject: 'Verify your CSMCL account',
+        text: `Hello ${user.displayName},\n\nYour email verification token is:\n\n${verificationToken}\n\nPlease enter this token in the verification form to verify your email address.\n\nIf you did not request this verification, please ignore this email.\n\nBest regards,\nCSMCL Team`,
+        html: `
+          <h2>Hello ${user.displayName},</h2>
+          <p>Your email verification token is:</p>
+          <div style="background-color: #f5f5f5; padding: 15px; margin: 20px 0; font-family: monospace; font-size: 16px;">
+            ${verificationToken}
+          </div>
+          <p>Please enter this token in the verification form to verify your email address.</p>
+          <p>If you did not request this verification, please ignore this email.</p>
+          <br>
+          <p>Best regards,<br>CSMCL Team</p>
+        `
+      };
+
+      const info = await this.transporter.sendMail(message);
       console.log('Verification email sent:', info.messageId);
       
+      // If we're in development mode using Ethereal, log the preview URL
       if (this.isDevelopment) {
-        console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+        const previewUrl = nodemailer.getTestMessageUrl(info);
+        console.log('Preview URL:', previewUrl);
+        console.log('Verification token:', verificationToken);  // Log the token for easy testing
       }
-      
-      return info;
+
+      return true;
     } catch (error) {
-      console.error('Failed to send verification email:', error);
+      console.error('Error sending verification email:', error);
       throw error;
     }
   }

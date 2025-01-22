@@ -12,18 +12,19 @@ export default defineConfig({
     }
   },
   server: {
+    host: 'local-dev.test',
     port: 3000,
     strictPort: true,
-    host: true, // Expose to all network interfaces
+    https: true,
     hmr: {
       overlay: true
     },
     allowedHosts: ['local-dev.test'],
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'https://local-dev.test:5000',
         changeOrigin: true,
-        secure: false,
+        secure: true,
         ws: true,
         configure: (proxy, options) => {
           proxy.on('error', (err, req, res) => {

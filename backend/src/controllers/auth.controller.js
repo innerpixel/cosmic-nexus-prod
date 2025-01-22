@@ -26,139 +26,80 @@ const generateTokens = (userId) => {
 // Register new user
 export const register = async (req, res) => {
   try {
-    // Ensure email service is initialized
-    await emailAccountService.ensureInitialized();
-
-    console.log('Registration attempt with data:', { 
-      ...req.body,
-      password: '[REDACTED]' 
-    });
-
     const { displayName, csmclName, regularEmail, simNumber, password } = req.body;
 
-    // Validate required fields
+    // Validate input
     if (!displayName || !csmclName || !regularEmail || !simNumber || !password) {
-      console.error('Missing required fields:', {
-        hasDisplayName: !!displayName,
-        hasCsmclName: !!csmclName,
-        hasRegularEmail: !!regularEmail,
-        hasSimNumber: !!simNumber,
-        hasPassword: !!password
-      });
       return res.status(400).json({
         status: 'error',
         message: 'All fields are required'
       });
     }
 
-    // Check if user already exists with either email
-    console.log('Checking for existing user...');
+    // Check if user already exists
     const existingUser = await User.findOne({
       $or: [
         { regularEmail },
-        { csmclName }
+        { csmclName },
+        { simNumber }
       ]
     });
 
     if (existingUser) {
-      console.log('User already exists:', existingUser.regularEmail === regularEmail ? 'Email taken' : 'CSMCL name taken');
       return res.status(400).json({
         status: 'error',
-        message: existingUser.regularEmail === regularEmail 
-          ? 'Email already registered' 
-          : 'CSMCL name already taken'
+        message: 'User already exists with this email, CSMCL name, or SIM number'
       });
     }
 
-    // Check if email account already exists on mail server
-    const emailExists = await emailAccountService.checkEmailAccount(csmclName);
-    if (emailExists) {
-      console.log('Email account already exists on mail server');
-      return res.status(400).json({
-        status: 'error',
-        message: 'CSMCL name already taken on mail server'
-      });
-    }
+    // Create verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create storage folders first
-    console.log('Creating user storage folders...');
-    await storageService.createUserFolders(csmclName);
-
-    // Create email account
-    console.log('Creating email account...');
-    const emailAccount = await emailAccountService.createEmailAccount(csmclName, regularEmail);
-
-    // Create new user
-    console.log('Creating new user...');
+    // Create user
     const user = new User({
       displayName,
       csmclName,
       regularEmail,
       simNumber,
-      password,
-      cosmicalEmail: emailAccount.email
+      password: hashedPassword,
+      verificationToken,
+      verificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
     });
 
-    // Generate verification tokens
-    console.log('Generating verification token...');
-    const emailToken = crypto.randomBytes(32).toString('hex');
-    user.emailVerificationToken = emailToken;
-    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await user.save();
 
-    try {
-      // Save user first
-      console.log('Saving user to database...');
-      await user.save();
-      console.log('User saved successfully');
-
-      // Send verification email
-      console.log('Sending verification email...');
-      await emailAccountService.sendVerificationEmail(user.regularEmail, emailToken, user.displayName);
-      console.log('Verification email sent successfully');
-    } catch (error) {
-      // If anything fails after creating resources, clean up
-      console.error('Error in final steps:', error);
-      await Promise.allSettled([
-        storageService.deleteUserFolders(csmclName),
-        emailAccountService.deleteEmailAccount(csmclName)
-      ]);
-      throw error;
+    // Create local Unix user in development mode
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        await emailAccountService.createLocalUser(csmclName, password);
+        console.log(`Local Unix user ${csmclName} created successfully`);
+      } catch (error) {
+        console.error('Failed to create local Unix user:', error);
+        // Don't fail registration if local user creation fails
+      }
     }
 
-    // Return success response
-    return res.status(201).json({
+    // Send verification email
+    try {
+      await emailAccountService.sendVerificationEmail(user, verificationToken);
+    } catch (error) {
+      console.error('Failed to send verification email:', error);
+      // Don't fail registration if email fails
+    }
+
+    res.status(201).json({
       status: 'success',
-      message: 'Registration successful. Please check your email for verification instructions.',
-      data: {
-        user: {
-          _id: user._id,
-          displayName: user.displayName,
-          csmclName: user.csmclName,
-          regularEmail: user.regularEmail,
-          cosmicalEmail: user.cosmicalEmail
-        }
-      }
+      message: 'User registered successfully. Please check your email for verification.'
     });
   } catch (error) {
     console.error('Registration error:', error);
-    if (error.name === 'ValidationError') {
-      console.error('Validation errors:', Object.keys(error.errors).map(key => ({
-        field: key,
-        message: error.errors[key].message
-      })));
-      return res.status(400).json({
-        status: 'error',
-        message: 'Validation failed',
-        errors: Object.keys(error.errors).map(key => ({
-          field: key,
-          message: error.errors[key].message
-        }))
-      });
-    }
     res.status(500).json({
       status: 'error',
-      message: 'An error occurred while registering',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Failed to register user'
     });
   }
 };
@@ -257,76 +198,43 @@ export const login = async (req, res) => {
 // Verify email
 export const verifyEmail = async (req, res) => {
   try {
-    const { token } = req.query;
+    const { token } = req.body;
 
     if (!token) {
-      console.error('No verification token provided');
       return res.status(400).json({
         status: 'error',
         message: 'Verification token is required'
       });
     }
 
+    // Find user with matching token and token not expired
     const user = await User.findOne({
-      emailVerificationToken: token,
-      emailVerificationExpires: { $gt: Date.now() }
+      verificationToken: token,
+      verificationExpires: { $gt: Date.now() }
     });
 
     if (!user) {
-      console.error('Invalid or expired verification token:', { token });
       return res.status(400).json({
         status: 'error',
         message: 'Invalid or expired verification token'
       });
     }
 
+    // Mark email as verified and clear verification token
     user.isEmailVerified = true;
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpires = undefined;
-
-    // If both email and phone are verified, create system accounts
-    if (user.isSimVerified) {
-      // Create mail account on cosmical.me
-      if (!user.mailAccountCreated) {
-        await emailAccountService.createMailAccount({
-          username: user.csmclName,
-          password: crypto.randomBytes(16).toString('hex') // Generate secure password
-        });
-        user.mailAccountCreated = true;
-      }
-
-      // Create home directory on csmcl.space
-      if (!user.homeDirCreated) {
-        await storageService.createUserHomeDir({
-          username: user.csmclName
-        });
-        user.homeDirCreated = true;
-      }
-    }
-
+    user.verificationToken = undefined;
+    user.verificationExpires = undefined;
     await user.save();
 
-    return res.status(200).json({
+    res.json({
       status: 'success',
-      message: 'Email verified successfully',
-      data: {
-        user: {
-          _id: user._id,
-          displayName: user.displayName,
-          csmclName: user.csmclName,
-          regularEmail: user.regularEmail,
-          isEmailVerified: user.isEmailVerified,
-          isSimVerified: user.isSimVerified,
-          mailAccountCreated: user.mailAccountCreated,
-          homeDirCreated: user.homeDirCreated
-        }
-      }
+      message: 'Email verified successfully'
     });
   } catch (error) {
     console.error('Email verification error:', error);
-    return res.status(500).json({
+    res.status(500).json({
       status: 'error',
-      message: 'An error occurred while verifying email'
+      message: 'Failed to verify email'
     });
   }
 };
