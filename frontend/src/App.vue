@@ -1,3 +1,12 @@
+<!-- 
+  App.vue - Root Component
+  Handles the main routing and layout structure for the Cosmic Nexus application.
+  Uses Vue Router for dynamic component rendering.
+
+  @description The root component of the Cosmic Nexus application, responsible for rendering the main layout and routing.
+  @author [Your Name]
+  @version 1.0.0
+-->
 <template>
   <router-view v-slot="{ Component }">
     <component :is="Component" />
