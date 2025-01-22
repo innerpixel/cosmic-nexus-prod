@@ -1,30 +1,44 @@
 import { promisify } from 'util';
 import { exec } from 'child_process';
+import path from 'path';
+
 const execAsync = promisify(exec);
 
 class UserSystemService {
   constructor() {
-    this.defaultShell = '/bin/bash';
     this.userGroup = 'csmcl';
+    this.defaultShell = '/bin/bash';
+    this.askpassPath = path.join(process.cwd(), 'scripts', 'sudo-askpass.sh');
     this.isDevelopment = process.env.NODE_ENV === 'development';
+  }
+
+  async execSudo(command) {
+    const env = {
+      ...process.env,
+      SUDO_ASKPASS: this.askpassPath
+    };
+    return execAsync(`sudo -A ${command}`, { env });
   }
 
   async createSystemUser(username, password) {
     try {
       console.log(`Creating system user: ${username}`);
       
-      // Execute commands separately to match our NOPASSWD sudoers entries
-      await execAsync(`sudo /usr/sbin/useradd -m -g ${this.userGroup} -s ${this.defaultShell} ${username}`);
+      // Create user with askpass
+      await this.execSudo(`/usr/sbin/useradd -m -g ${this.userGroup} -s ${this.defaultShell} ${username}`);
       console.log('User created, setting password...');
       
-      await execAsync(`echo "${username}:${password}" | sudo /usr/bin/chpasswd`);
+      // Set password
+      await execAsync(`echo "${username}:${password}" | sudo -A /usr/bin/chpasswd`, { 
+        env: { SUDO_ASKPASS: this.askpassPath } 
+      });
       console.log('Password set successfully...');
       
       // Create mail directory structure in user's home
-      await execAsync(`sudo mkdir -p /home/${username}/Maildir/{new,cur,tmp}`);
-      await execAsync(`sudo /usr/sbin/usermod -g ${this.userGroup} ${username}`);
-      await execAsync(`sudo chown -R ${username}:${this.userGroup} /home/${username}/Maildir`);
-      await execAsync(`sudo chmod -R 700 /home/${username}/Maildir`);
+      await this.execSudo(`mkdir -p /home/${username}/Maildir/{new,cur,tmp}`);
+      await this.execSudo(`/usr/sbin/usermod -g ${this.userGroup} ${username}`);
+      await this.execSudo(`chown -R ${username}:${this.userGroup} /home/${username}/Maildir`);
+      await this.execSudo(`chmod -R 700 /home/${username}/Maildir`);
       
       // Set quota only in production
       if (!this.isDevelopment) {
@@ -43,12 +57,12 @@ class UserSystemService {
     try {
       console.log(`Deleting system user: ${username}`);
       
-      // Remove user and their home directory using NOPASSWD command
-      await execAsync(`sudo /usr/sbin/userdel -r ${username}`);
+      // Remove user and their home directory with askpass
+      await this.execSudo(`/usr/sbin/userdel -r ${username}`);
       
       // Clean up any remaining files
       if (await this.fileExists(`/var/spool/mail/${username}`)) {
-        await execAsync(`sudo rm -rf /var/spool/mail/${username}`);
+        await this.execSudo(`rm -rf /var/spool/mail/${username}`);
       }
       
       console.log(`System user ${username} deleted successfully`);
@@ -79,7 +93,7 @@ class UserSystemService {
     }
     
     try {
-      await execAsync(`sudo setquota -u ${username} 0 ${quotaMB}M 0 0 /home`);
+      await this.execSudo(`setquota -u ${username} 0 ${quotaMB}M 0 0 /home`);
       return true;
     } catch (error) {
       console.error('Error setting user quota:', error);
