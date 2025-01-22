@@ -23,7 +23,7 @@ const routes = [
   {
     path: '/verify-email',
     name: 'verify-email',
-    component: () => import('../views/auth/VerifyEmail.vue'),
+    component: () => import('../components/EmailVerification.vue'),
     meta: { requiresGuest: true }
   },
   {
@@ -43,11 +43,6 @@ const routes = [
     name: 'dashboard',
     component: () => import('../views/Dashboard.vue'),
     meta: { requiresAuth: true }
-  },
-  {
-    path: '/verify-email',
-    name: 'EmailVerification',
-    component: () => import('../components/EmailVerification.vue')
   }
 ]
 
