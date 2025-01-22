@@ -53,16 +53,34 @@ jobs:
             cd ../backend
             npm ci
             
+            # Verify directory structure and permissions
+            echo "Setting up directory structure..."
+            sudo mkdir -p /var/www/csmcl.space/backend
+            sudo chown -R www-data:www-data /var/www/csmcl.space
+            
+            # Copy backend files
+            echo "Copying backend files..."
+            sudo cp -r * /var/www/csmcl.space/backend/
+            
             # Setup systemd service
             echo "Setting up systemd service..."
+            echo "1. Copying service file..."
             sudo cp deployment/systemd/csmcl-space.service /etc/systemd/system/
             sudo chown root:root /etc/systemd/system/csmcl-space.service
             sudo chmod 644 /etc/systemd/system/csmcl-space.service
-            echo "Reloading systemd daemon..."
+            
+            echo "2. Reloading systemd..."
             sudo systemctl daemon-reload
-            echo "Enabling service..."
+            
+            echo "3. Enabling service..."
             sudo systemctl enable csmcl-space
-            echo "Starting service..."
-            sudo systemctl start csmcl-space || echo "Service start attempted"
+            
+            echo "4. Starting service..."
+            sudo systemctl start csmcl-space || {
+              echo "Service failed to start. Checking status..."
+              sudo systemctl status csmcl-space --no-pager || true
+              echo "Checking logs..."
+              sudo journalctl -u csmcl-space --no-pager -n 50 || true
+            }
             
             echo "Deployment completed successfully at $(date)"
