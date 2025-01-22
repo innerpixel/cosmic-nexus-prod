@@ -53,6 +53,14 @@ jobs:
             cd ../backend
             npm ci
             
+            # Setup systemd service
+            echo "Setting up systemd service..."
+            if [ ! -f "/etc/systemd/system/csmcl-space.service" ]; then
+              sudo cp ../deployment/systemd/csmcl-space.service /etc/systemd/system/
+              sudo systemctl daemon-reload
+              sudo systemctl enable csmcl-space
+            fi
+            
             # Restart service
             echo "Restarting service..."
             sudo systemctl restart csmcl-space
