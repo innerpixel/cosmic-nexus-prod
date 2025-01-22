@@ -15,25 +15,11 @@ export default defineConfig({
     host: 'local-dev.test',
     port: 3000,
     strictPort: true,
-    https: true,
-    hmr: {
-      overlay: true
-    },
-    allowedHosts: ['local-dev.test'],
     proxy: {
       '/api': {
-        target: 'https://local-dev.test:5000',
+        target: 'https://local-dev.test',
         changeOrigin: true,
-        secure: true,
-        ws: true,
-        configure: (proxy, options) => {
-          proxy.on('error', (err, req, res) => {
-            console.log('proxy error', err);
-          });
-          proxy.on('proxyReq', (proxyReq, req, res) => {
-            console.log('proxyReq', req.url);
-          });
-        }
+        secure: true
       }
     }
   },
