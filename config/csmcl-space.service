@@ -12,11 +12,14 @@ Restart=always
 Environment=NODE_ENV=production
 Environment=PORT=3000
 
-# Add required capabilities
-AmbientCapabilities=CAP_NET_BIND_SERVICE
+# Add required capabilities for user management
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_SETUID CAP_SETGID CAP_CHOWN
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_SETUID CAP_SETGID CAP_CHOWN
+
+# Security settings
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/home/storage/users
+ReadWritePaths=/home /var/spool/mail
 
 [Install]
 WantedBy=multi-user.target
