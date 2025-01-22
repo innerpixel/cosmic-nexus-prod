@@ -12,9 +12,12 @@ export default defineConfig({
     }
   },
   server: {
-    host: 'localhost',
+    host: true, // Listen on all network interfaces
     port: 3000,
     strictPort: true,
+    hmr: {
+      host: 'local-dev.test'
+    },
     proxy: {
       '/api': {
         target: 'https://local-dev.test',
