@@ -50,6 +50,14 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  verificationToken: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  verificationExpires: {
+    type: Date
+  },
   isSimVerified: {
     type: Boolean,
     default: false
