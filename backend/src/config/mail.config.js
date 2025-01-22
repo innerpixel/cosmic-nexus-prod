@@ -1,23 +1,20 @@
 export const mailConfig = {
   // SMTP Configuration
   smtp: {
-    host: process.env.NODE_ENV === 'development' ? 'localhost' : 'mail.cosmical.me',
-    port: parseInt(process.env.MAIL_PORT) || (process.env.NODE_ENV === 'development' ? 1025 : 25),
-    secure: false, // Use TLS in production
-    auth: process.env.NODE_ENV === 'development' ? null : {
+    host: process.env.MAIL_HOST || (process.env.NODE_ENV === 'development' ? 'smtp.ethereal.email' : 'mail.cosmical.me'),
+    port: parseInt(process.env.MAIL_PORT) || (process.env.NODE_ENV === 'development' ? 587 : 25),
+    secure: process.env.MAIL_SECURE === 'true',
+    auth: {
       user: process.env.MAIL_USER,
-      pass: process.env.MAIL_PASSWORD
+      pass: process.env.MAIL_PASS || process.env.MAIL_PASSWORD
     },
-    ignoreTLS: process.env.NODE_ENV === 'development',
     tls: {
       rejectUnauthorized: false
-    },
-    debug: process.env.NODE_ENV === 'development',
-    logger: process.env.NODE_ENV === 'development'
+    }
   },
 
   // Mail domain configuration
-  domain: process.env.NODE_ENV === 'development' ? 'localhost' : 'cosmical.me',
+  domain: process.env.MAIL_DOMAIN || (process.env.NODE_ENV === 'development' ? 'ethereal.email' : 'cosmical.me'),
   
   // Development settings
   development: {
