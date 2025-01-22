@@ -12,7 +12,7 @@ export default defineConfig({
     }
   },
   server: {
-    host: 'local-dev.test',
+    host: 'localhost',
     port: 3000,
     strictPort: true,
     proxy: {
