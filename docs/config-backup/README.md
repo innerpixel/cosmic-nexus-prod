@@ -58,6 +58,39 @@ Development Mode: Uses ethereal.email for testing
 - Local development domain: local-dev.test
 - Production domain: csmcl.space
 - Mail server domain: cosmical.me (mail server only)
+- SSL: Enabled with Let's Encrypt for both domains
+- DKIM: Configured via OpenDKIM
+- SPF: Configured
+- DMARC: Configured
+
+### Current Server Configuration (Updated 2025-01-23)
+
+#### Mail Server (cosmical.me)
+```properties
+Host: mail.cosmical.me
+TLS: Enabled with Let's Encrypt
+DKIM: Active via localhost:8891
+Allowed Networks: 127.0.0.0/8, [::1]/128, 147.93.58.192/32
+Web Access: Blocked (returns 444)
+```
+
+#### Web Server (csmcl.space)
+```properties
+Domain: csmcl.space, www.csmcl.space
+SSL: Enabled with Let's Encrypt
+Frontend: /var/www/csmcl.space/frontend/dist
+Backend API: localhost:5000
+Security Headers: Enabled
+- X-Frame-Options: SAMEORIGIN
+- X-XSS-Protection: 1; mode=block
+- X-Content-Type-Options: nosniff
+- Referrer-Policy: no-referrer-when-downgrade
+```
+
+### System Users
+- root: System administrator
+- ubuntu: Default system user
+- test: Test user account
 
 ### Git Repository Setup
 ```bash
