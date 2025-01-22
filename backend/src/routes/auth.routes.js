@@ -1,59 +1,179 @@
 import express from 'express';
-import { 
-  register, 
-  login, 
-  verifyEmail, 
-  forgotPassword, 
-  resetPassword, 
-  resendVerificationEmail 
-} from '../controllers/auth.controller.js';
-import { rateLimiter } from '../middleware/rate-limiter.js';
 import bcrypt from 'bcrypt';
 import nodemailer from 'nodemailer';
+import { createTestAccount, createTransport } from 'ethereal-email';
+import { StorageService } from '../services/storage.service.js';
+import User from '../models/user.model.js'; // Add User model import
 
+const storageService = new StorageService();
 const router = express.Router();
 
-// Create email transport for development
-async function setupEmailTransport() {
-  // In development, use direct SMTP connection
-  if (process.env.NODE_ENV === 'development') {
-    return nodemailer.createTransport({
-      sendmail: true,
-      newline: 'unix',
-      path: '/usr/sbin/sendmail'
+// Create Ethereal test account for development
+let testAccount = null;
+let transporter = null;
+
+async function setupEtherealEmail() {
+  if (!testAccount) {
+    testAccount = await createTestAccount();
+    console.log('Ethereal Email test account:', testAccount);
+    
+    transporter = createTransport({
+      host: 'smtp.ethereal.email',
+      port: 587,
+      secure: false,
+      auth: {
+        user: testAccount.user,
+        pass: testAccount.pass,
+      },
     });
   }
-  
-  // Production configuration
-  const transport = {
-    host: process.env.MAIL_HOST,
-    port: parseInt(process.env.MAIL_PORT),
-    secure: process.env.MAIL_SECURE === 'true',
-    auth: {
-      user: process.env.MAIL_USER,
-      pass: process.env.MAIL_PASSWORD
-    }
-  };
-  
-  console.log('Setting up email transport with:', {
-    host: transport.host,
-    port: transport.port,
-    user: transport.auth.user,
-    env: process.env.NODE_ENV
-  });
-  
-  return nodemailer.createTransport(transport);
+  return transporter;
 }
 
-// Apply rate limiting to auth routes
-router.use(rateLimiter);
+// Register endpoint
+router.post('/register', async (req, res) => {
+  try {
+    const { email, password, name } = req.body;
+    
+    // Basic validation
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+    
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    
+    // Create user
+    const user = new User({
+      email,
+      name,
+      password: hashedPassword
+    });
+    
+    // Save user to database
+    await user.save();
+    
+    // Setup Ethereal email
+    const emailTransporter = await setupEtherealEmail();
+    
+    // Send welcome email
+    const info = await emailTransporter.sendMail({
+      from: '"Cosmic Nexus" <cosmic@nexus.test>',
+      to: email,
+      subject: 'Welcome to Cosmic Nexus!',
+      text: `Welcome ${name}! Thank you for registering with Cosmic Nexus.`,
+      html: `<h1>Welcome ${name}!</h1><p>Thank you for registering with Cosmic Nexus.</p>`,
+    });
+    
+    console.log('Welcome email sent:', info);
+    console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+    
+    // Update user storage
+    await storageService.createUserFolders(user.email);
+    
+    res.status(201).json({ 
+      message: 'Registration successful',
+      user: { id: user.id, email: user.email, name: user.name },
+      emailPreview: nodemailer.getTestMessageUrl(info)
+    });
+    
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
 
-// Auth routes
-router.post('/register', register);
-router.post('/login', login);
-router.get('/verify-email', verifyEmail);
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password/:token', resetPassword);
-router.post('/resend-verification', resendVerificationEmail);
+// Email verification endpoint
+router.post('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'Verification token is required' 
+      });
+    }
+
+    // Find user with this verification token
+    const user = await User.findOne({ verificationToken: token });
+
+    if (!user) {
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Invalid verification token' 
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'Email is already verified' 
+      });
+    }
+
+    // Check if token is expired
+    if (user.verificationExpires && user.verificationExpires < new Date()) {
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'Verification token has expired' 
+      });
+    }
+
+    // Update user
+    user.isEmailVerified = true;
+    user.verificationToken = undefined;
+    user.verificationExpires = undefined;
+    await user.save();
+
+    res.json({ 
+      status: 'success',
+      message: 'Email verified successfully' 
+    });
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ 
+      status: 'error',
+      message: 'An error occurred during email verification' 
+    });
+  }
+});
+
+// Delete user endpoint
+router.delete('/user/:csmclName', async (req, res) => {
+  try {
+    const { csmclName } = req.params;
+    
+    // Find and delete user from database
+    const user = await User.findOne({ csmclName });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Delete user's storage folders
+    await storageService.deleteUserFolders(csmclName);
+    
+    // Delete user from database
+    await User.deleteOne({ csmclName });
+
+    // Execute system user removal command
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    
+    try {
+      await execAsync(`sudo userdel -r ${csmclName}`);
+    } catch (error) {
+      // If system user doesn't exist, we can ignore the error
+      console.log(`System user removal: ${error.message}`);
+    }
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
 
 export default router;
