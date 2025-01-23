@@ -1,62 +1,152 @@
-# Space Station Outpost
+# Cosmic Nexus
 
-An interactive 3D space station visualization built with Vue 3 and Three.js. This project creates an immersive space environment featuring a detailed space station with both exterior and interior views.
+A modern web application for space exploration and community engagement. Built with Vue 3 and Express, featuring a robust authentication system and beautiful UI design.
 
 ## Features
 
-- **Detailed Space Station Model**
-  - Rotating outer rings with observation windows
-  - Solar panels with dynamic lighting
-  - Defense turrets with scanning behavior
-  - Interior corridor system with multiple levels
+- **Authentication System**
+  - Secure user registration and login
+  - Email verification
+  - Password reset functionality
+  - JWT-based authentication
 
-- **Interactive Elements**
-  - Switch between exterior and interior views
-  - Orbital camera controls
-  - Dynamic lighting and glow effects
-  - Computer terminals with status indicators
+- **Modern UI/UX**
+  - Responsive design with TailwindCSS
+  - Dark mode support
+  - Interactive components
+  - Form validation with vee-validate and zod
 
-- **Visual Effects**
-  - Bloom post-processing for enhanced lighting
-  - Pulsing energy core
-  - Glowing windows and accents
-  - Metallic material reflections
+- **Backend Services**
+  - RESTful API with Express
+  - MongoDB database integration
+  - Email service integration
+  - Health check endpoints
 
-## Technologies Used
+## Technologies
 
-- Vue 3
-- Three.js
-- TailwindCSS
+### Frontend
+- Vue 3 (Composition API)
 - Vite
+- TailwindCSS
+- Vee-validate with Zod
+- Vue Router
+- Pinia for state management
 
-## Setup
+### Backend
+- Node.js
+- Express
+- MongoDB with Mongoose
+- JWT for authentication
+- Nodemailer for emails
+
+### Infrastructure
+- Nginx for web server
+- PM2 for process management
+- GitHub Actions for CI/CD
+- SSL/TLS encryption
+
+## Development Setup
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/CSMCL/Space-Station-Outpost.git
-   cd Space-Station-Outpost
+   git clone <repository-url>
+   cd cosmic-nexus
    ```
 
 2. Install dependencies:
    ```bash
+   # Install frontend dependencies
+   cd frontend
+   npm install
+
+   # Install backend dependencies
+   cd ../backend
    npm install
    ```
 
-3. Run the development server:
+3. Configure environment variables:
    ```bash
-   npm run dev
+   # Backend configuration (.env)
+   NODE_ENV=development
+   MONGODB_URI=your_mongodb_uri
+   JWT_SECRET=your_jwt_secret
+   MAIL_HOST=your_mail_host
+   MAIL_PORT=your_mail_port
+   MAIL_USER=your_mail_user
+   MAIL_FROM=your_mail_from
    ```
 
-## Controls
+4. Start development servers:
+   ```bash
+   # Using the development script
+   ./dev.sh
+   ```
 
-- **Mouse Controls**
-  - Left Click + Drag: Rotate camera
-  - Right Click + Drag: Pan camera
-  - Scroll: Zoom in/out
+   This will start:
+   - Frontend on http://localhost:3001
+   - Backend on http://localhost:5001
 
-- **Interface**
-  - "Enter Station" button: Switch to interior view
-  - "Exit Station" button: Return to exterior view
+## Development Environments
+
+### Local Development
+- Frontend: http://localhost:3001
+- Backend: http://localhost:5001
+- Hot-reloading enabled
+- Independent of deployed version
+
+### Local Deployment (local-dev.test)
+- URL: https://local-dev.test
+- Nginx served
+- Mirrors production setup
+- Updates via git push to local branch
+
+### Production
+- URL: https://csmcl.space
+- Automated deployment via GitHub Actions
+- SSL/TLS encryption
+- PM2 process management
+
+## Available Scripts
+
+- `dev.sh`: Development environment manager
+  - Start/stop frontend and backend servers
+  - Monitor service health
+  - Switch between development ports
+  - Check deployed services status
+
+## Deployment
+
+### Local Deployment
+```bash
+# Push to local repository
+git push local main
+```
+
+### Production Deployment
+```bash
+# Push to production repository
+git push production main
+```
+
+GitHub Actions will automatically deploy to production when pushing to the main branch.
+
+## Directory Structure
+
+```
+cosmic-nexus/
+├── frontend/           # Vue 3 frontend application
+├── backend/           # Express backend server
+├── .github/           # GitHub Actions workflows
+├── nginx/            # Nginx configuration
+└── dev.sh            # Development environment script
+```
+
+## Contributing
+
+1. Create a feature branch
+2. Make your changes
+3. Test in local-dev.test environment
+4. Submit a pull request
 
 ## License
 
