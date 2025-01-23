@@ -7,6 +7,17 @@ import { login } from '../controllers/auth.controller.js';
 
 const router = express.Router();
 
+// Debug middleware for auth routes
+router.use((req, res, next) => {
+  console.log('Auth route accessed:', {
+    method: req.method,
+    path: req.path,
+    body: req.body,
+    headers: req.headers
+  });
+  next();
+});
+
 // Login endpoint
 router.post('/login', login);
 
