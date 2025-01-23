@@ -139,3 +139,19 @@ local	/var/git/local.csmcl-space.git (push)
 production	git@github.com:innerpixel/cosmic-nexus-prod.git (fetch)
 production	git@github.com:innerpixel/cosmic-nexus-prod.git (push)
 ```
+
+--- SELinux Configuration ---
+```bash
+# For local development, SELinux should be set to permissive mode
+# Temporary change (until reboot):
+sudo setenforce 0
+
+# Permanent change:
+# Edit /etc/selinux/config and set:
+# SELINUX=permissive
+
+# Check current status:
+sestatus
+```
+
+Note: SELinux is set to permissive mode for local development to avoid permission issues with nginx serving files from /var/www/cosmic-nexus/. In production, proper SELinux contexts should be set instead.
