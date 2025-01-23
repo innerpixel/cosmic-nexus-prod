@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
 
-const API_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api'  // Using Vite's proxy configuration
+const API_URL = import.meta.env.VITE_API_URL || '/api'  // Using Vite's proxy configuration
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
