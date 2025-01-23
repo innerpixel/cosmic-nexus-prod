@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import emailAccountService from '../services/email-account.service.js';
 import User from '../models/user.model.js';
+import * as authController from '../controllers/auth.controller.js';
 
 const router = express.Router();
 
@@ -49,61 +50,44 @@ router.post('/register', async (req, res) => {
       displayName,
       csmclName,
       simNumber,
+      regularEmail: regularEmail.toLowerCase(),
       password: hashedPassword,
-      regularEmail,
       verificationToken,
-      verificationExpires,
-      isEmailVerified: false
+      verificationExpires
     });
-    
-    // Save user to database
+
     await user.save();
-    console.log('User saved to MongoDB successfully');
-    
+    console.log('User saved to MongoDB:', user.csmclName);
+
+    // Send verification email
     try {
-      // Create system user and email account
-      const emailResult = await emailAccountService.createEmailAccount(csmclName, password);
-      
-      if (emailResult.status === 'pending') {
-        console.log('Email account creation started:', emailResult.message);
-        return res.status(202).json({
-          status: 'pending',
-          message: 'Registration started. User creation in progress.',
-          data: {
-            displayName,
-            csmclName,
-            regularEmail
-          }
-        });
-      }
-      
-      // Try to send verification email, but don't fail if it doesn't work
-      try {
-        await emailAccountService.sendVerificationEmail(user, verificationToken);
-        console.log('Verification email sent');
-      } catch (emailError) {
-        console.warn('Could not send verification email:', emailError.message);
-      }
-      
-      res.status(201).json({
-        status: 'success',
-        message: 'Registration successful. Please check your email for verification.',
-        verificationToken // Only in development
-      });
-    } catch (systemError) {
-      // If system user creation fails, delete the MongoDB user
-      await User.deleteOne({ _id: user._id });
-      throw new Error(`Failed to create system user: ${systemError.message}`);
+      await emailAccountService.sendVerificationEmail(user);
+      console.log('Verification email sent successfully');
+    } catch (emailError) {
+      console.error('Error sending verification email:', emailError);
+      // Continue with user creation even if email fails
     }
+
+    res.status(201).json({
+      status: 'pending',
+      message: 'Registration started. User creation in progress.',
+      data: {
+        displayName: user.displayName,
+        csmclName: user.csmclName,
+        regularEmail: user.regularEmail
+      }
+    });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'error',
-      message: 'Registration failed',
-      details: error.message 
+      message: 'An error occurred during registration'
     });
   }
 });
+
+// Login endpoint
+router.post('/login', authController.login);
 
 // Email verification endpoint - handles both URL token and pasted token
 router.post('/verify-email', async (req, res) => {
@@ -199,7 +183,7 @@ router.get('/verify-email/:token', async (req, res) => {
 router.post('/resend-verification', async (req, res) => {
   try {
     const { email } = req.body;
-
+    
     if (!email) {
       return res.status(400).json({
         status: 'error',
@@ -207,9 +191,8 @@ router.post('/resend-verification', async (req, res) => {
       });
     }
 
-    // Find user by email
-    const user = await User.findOne({ regularEmail: email });
-
+    const user = await User.findOne({ regularEmail: email.toLowerCase() });
+    
     if (!user) {
       return res.status(404).json({
         status: 'error',
@@ -225,28 +208,29 @@ router.post('/resend-verification', async (req, res) => {
     }
 
     // Generate new verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-    // Update user with new token
-    user.verificationToken = verificationToken;
-    user.verificationExpires = verificationExpires;
+    user.verificationToken = crypto.randomBytes(32).toString('hex');
+    user.verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     await user.save();
 
     // Send new verification email
-    await emailAccountService.sendVerificationEmail(user, verificationToken);
-    console.log('New verification email sent');
-
-    res.json({
-      status: 'success',
-      message: 'New verification token sent. Please check your email.'
-    });
-
+    try {
+      await emailAccountService.sendVerificationEmail(user);
+      res.json({
+        status: 'success',
+        message: 'Verification email sent successfully'
+      });
+    } catch (error) {
+      console.error('Error sending verification email:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Error sending verification email'
+      });
+    }
   } catch (error) {
-    console.error('Error resending verification token:', error);
+    console.error('Resend verification error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to resend verification token'
+      message: 'An error occurred while resending verification email'
     });
   }
 });
