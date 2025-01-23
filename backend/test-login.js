@@ -13,7 +13,7 @@ const testInvalidLogin = async () => {
     // Test case 1: Wrong password
     console.log('\nTest 1: Wrong password');
     try {
-      await axiosInstance.post('https://local-dev.test/api/auth/login', {
+      await axiosInstance.post('https://local-dev.test:5000/api/auth/login', {
         email: 'nova@local-dev.test',
         password: 'WrongPassword123!'
       });
@@ -24,7 +24,7 @@ const testInvalidLogin = async () => {
     // Test case 2: Non-existent email
     console.log('\nTest 2: Non-existent email');
     try {
-      await axiosInstance.post('https://local-dev.test/api/auth/login', {
+      await axiosInstance.post('https://local-dev.test:5000/api/auth/login', {
         email: 'nonexistent@local-dev.test',
         password: 'StardustPath789!'
       });
@@ -35,7 +35,7 @@ const testInvalidLogin = async () => {
     // Test case 3: Invalid email format
     console.log('\nTest 3: Invalid email format');
     try {
-      await axiosInstance.post('https://local-dev.test/api/auth/login', {
+      await axiosInstance.post('https://local-dev.test:5000/api/auth/login', {
         email: 'invalid.email',
         password: 'StardustPath789!'
       });
@@ -46,7 +46,7 @@ const testInvalidLogin = async () => {
     // Test case 4: Empty credentials
     console.log('\nTest 4: Empty credentials');
     try {
-      await axiosInstance.post('https://local-dev.test/api/auth/login', {
+      await axiosInstance.post('https://local-dev.test:5000/api/auth/login', {
         email: '',
         password: ''
       });
