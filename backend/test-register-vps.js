@@ -18,16 +18,16 @@ const testVPSRegistration = async () => {
     try {
       const response = await axiosInstance.post('https://csmcl.space/api/auth/register', {
         displayName: "Nova Stardust",
-        csmclName: "nova-stardust",
-        regularEmail: "nova@cosmical.me", // Using cosmical.me domain for testing
-        simNumber: "+12025550179",
-        password: "NovaStardust2025!"
+        csmclName: "nova-stardust-23",  // Matches /^[a-z0-9-]+$/
+        regularEmail: "nova.stardust@cosmical.me",  // Valid email format
+        simNumber: "+12025550179",  // Matches /^\+?[1-9]\d{1,14}$/
+        password: "NovaStardust2025!"  // At least 8 chars
       });
       console.log('Registration Response:', response.data);
       
       // If registration successful, we should receive a pending status
       if (response.data.status === 'pending') {
-        console.log('Registration pending. Check verification email at nova@cosmical.me');
+        console.log('Registration pending. Check verification email at nova.stardust@cosmical.me');
       }
     } catch (error) {
       console.error('Registration Error:', error.response?.data || error.message);
@@ -47,8 +47,8 @@ const testVPSRegistration = async () => {
     try {
       await axiosInstance.post('https://csmcl.space/api/auth/register', {
         displayName: "Invalid Email User",
-        csmclName: "invalid-email",
-        regularEmail: "not-an-email",
+        csmclName: "invalid-email-23",
+        regularEmail: "not-an-email",  // Invalid email format
         simNumber: "+12025550180",
         password: "Password123!"
       });
@@ -60,9 +60,9 @@ const testVPSRegistration = async () => {
     try {
       await axiosInstance.post('https://csmcl.space/api/auth/register', {
         displayName: "Invalid Phone User",
-        csmclName: "invalid-phone",
+        csmclName: "invalid-phone-23",
         regularEmail: "invalid.phone@cosmical.me",
-        simNumber: "not-a-phone",
+        simNumber: "not-a-phone",  // Invalid phone format
         password: "Password123!"
       });
     } catch (error) {
