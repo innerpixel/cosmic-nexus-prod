@@ -3,9 +3,12 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import emailAccountService from '../services/email-account.service.js';
 import User from '../models/user.model.js';
-import * as authController from '../controllers/auth.controller.js';
+import { login } from '../controllers/auth.controller.js';
 
 const router = express.Router();
+
+// Login endpoint
+router.post('/login', login);
 
 // Register endpoint
 router.post('/register', async (req, res) => {
@@ -85,9 +88,6 @@ router.post('/register', async (req, res) => {
     });
   }
 });
-
-// Login endpoint
-router.post('/login', authController.login);
 
 // Email verification endpoint - handles both URL token and pasted token
 router.post('/verify-email', async (req, res) => {
