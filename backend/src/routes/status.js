@@ -1,8 +1,9 @@
-const express = require('express');
+import express from 'express';
+import mongoose from 'mongoose';
+import nodemailer from 'nodemailer';
+import { version, commit } from '../version.js';
+
 const router = express.Router();
-const mongoose = require('mongoose');
-const nodemailer = require('nodemailer');
-const version = require('../version');
 
 // Health check endpoint
 router.get('/health', async (req, res) => {
@@ -34,7 +35,7 @@ router.get('/health', async (req, res) => {
 
 // Version endpoint
 router.get('/version', (req, res) => {
-    res.json(version);
+    res.json({ version, commit });
 });
 
-module.exports = router;
+export default router;

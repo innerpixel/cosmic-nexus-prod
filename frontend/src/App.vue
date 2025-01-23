@@ -17,9 +17,7 @@ import StatusFooter from './components/StatusFooter.vue';
     <router-view v-slot="{ Component }">
       <component :is="Component" />
     </router-view>
-    <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-      Welcome to CSMCL Space - Your Digital Hub (Updated)
-    </h1>
+  
     <StatusFooter />
   </div>
 </template>
