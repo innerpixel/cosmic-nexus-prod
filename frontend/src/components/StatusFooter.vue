@@ -7,9 +7,11 @@ const mailStatus = ref('checking...');
 const commitHash = ref('loading...');
 const error = ref(null);
 
+const API_BASE = import.meta.env.VITE_API_URL || 'https://local-dev.test/api';
+
 const checkHealth = async () => {
   try {
-    const response = await fetch('/api/health');
+    const response = await fetch(`${API_BASE}/health`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -19,7 +21,7 @@ const checkHealth = async () => {
     error.value = null;
   } catch (err) {
     console.error('Health check failed:', err);
-    error.value = err.message;
+    error.value = `Health check failed: ${err.message}`;
     dbStatus.value = 'error';
     mailStatus.value = 'error';
   }
@@ -27,7 +29,7 @@ const checkHealth = async () => {
 
 const getVersion = async () => {
   try {
-    const response = await fetch('/api/version');
+    const response = await fetch(`${API_BASE}/version`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -37,7 +39,7 @@ const getVersion = async () => {
     error.value = null;
   } catch (err) {
     console.error('Version check failed:', err);
-    error.value = err.message;
+    error.value = `Version check failed: ${err.message}`;
     version.value = 'error';
     commitHash.value = 'error';
   }
