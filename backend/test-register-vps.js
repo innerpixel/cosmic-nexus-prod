@@ -12,7 +12,7 @@ const testVPSRegistration = async () => {
 
     console.log('\nTest 1: Valid Registration');
     try {
-      const response = await axiosInstance.post('https://csmcl.space/api/auth/register', {
+      const response = await axiosInstance.post('https://csmcl.space/api/v1/auth/register', {
         displayName: "Dumbledore The Wise",
         csmclName: "dumbledore",
         regularEmail: "dumbledore@csmcl.space",
@@ -26,7 +26,7 @@ const testVPSRegistration = async () => {
 
     console.log('\nTest 2: Missing Required Fields');
     try {
-      await axiosInstance.post('https://csmcl.space/api/auth/register', {
+      await axiosInstance.post('https://csmcl.space/api/v1/auth/register', {
         displayName: "Incomplete User"
       });
     } catch (error) {
@@ -35,7 +35,7 @@ const testVPSRegistration = async () => {
 
     console.log('\nTest 3: Invalid Email Format');
     try {
-      await axiosInstance.post('https://csmcl.space/api/auth/register', {
+      await axiosInstance.post('https://csmcl.space/api/v1/auth/register', {
         displayName: "Invalid Email User",
         csmclName: "invalid",
         regularEmail: "not-an-email",
@@ -48,7 +48,7 @@ const testVPSRegistration = async () => {
 
     console.log('\nTest 4: Invalid Phone Number');
     try {
-      await axiosInstance.post('https://csmcl.space/api/auth/register', {
+      await axiosInstance.post('https://csmcl.space/api/v1/auth/register', {
         displayName: "Invalid Phone User",
         csmclName: "invalid-phone",
         regularEmail: "invalid.phone@csmcl.space",
