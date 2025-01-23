@@ -10,7 +10,9 @@
 <template>
   <router-view v-slot="{ Component }">
     <component :is="Component" />
-    <h1 class="text-4xl font-bold mb-4">Welcome to CSMCL Space - Your Digital Hub</h1>
+    <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+      Welcome to CSMCL Space - Your Digital Hub (Updated)
+    </h1>
   </router-view>
 </template>
 
