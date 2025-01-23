@@ -62,8 +62,20 @@ router.post('/register', async (req, res) => {
     
     try {
       // Create system user and email account
-      await emailAccountService.createEmailAccount(csmclName, password);
-      console.log('System user and email account created successfully');
+      const emailResult = await emailAccountService.createEmailAccount(csmclName, password);
+      
+      if (emailResult.status === 'pending') {
+        console.log('Email account creation started:', emailResult.message);
+        return res.status(202).json({
+          status: 'pending',
+          message: 'Registration started. User creation in progress.',
+          data: {
+            displayName,
+            csmclName,
+            regularEmail
+          }
+        });
+      }
       
       // Try to send verification email, but don't fail if it doesn't work
       try {
@@ -235,6 +247,43 @@ router.post('/resend-verification', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to resend verification token'
+    });
+  }
+});
+
+// Check user creation status
+router.get('/status/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    
+    // Check if user exists in MongoDB
+    const user = await User.findOne({ csmclName: username });
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Check system user status
+    const systemUserExists = await emailAccountService.checkEmailAccount(username);
+    
+    if (systemUserExists) {
+      res.json({
+        status: 'completed',
+        message: 'User creation completed'
+      });
+    } else {
+      res.json({
+        status: 'pending',
+        message: 'User creation in progress'
+      });
+    }
+  } catch (error) {
+    console.error('Status check error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to check user status'
     });
   }
 });

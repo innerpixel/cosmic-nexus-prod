@@ -24,14 +24,31 @@ class UserSystemService {
     try {
       console.log(`Creating system user: ${username}`);
       
+      // Start async user creation process
+      this.createUserAsync(username, password).catch(error => {
+        console.error('Async user creation failed:', error);
+      });
+      
+      // Return immediately with pending status
+      return { status: 'pending', message: 'User creation started' };
+    } catch (error) {
+      console.error('Failed to start user creation:', error);
+      throw new Error('Failed to start user creation');
+    }
+  }
+
+  async createUserAsync(username, password) {
+    try {
       // Create user with askpass
       await this.execSudo(`/usr/sbin/useradd -m -g ${this.userGroup} -s ${this.defaultShell} ${username}`);
       console.log('User created, setting password...');
       
-      // Set password
-      await execAsync(`echo "${username}:${password}" | sudo -A /usr/bin/chpasswd`, { 
-        env: { SUDO_ASKPASS: this.askpassPath } 
-      });
+      // Set password using chpasswd
+      const tempFile = `/tmp/.passwd_${username}_${Date.now()}`;
+      await execAsync(`echo "${username}:${password}" > ${tempFile}`);
+      await this.execSudo(`chmod 600 ${tempFile}`);
+      await this.execSudo(`/usr/sbin/chpasswd < ${tempFile}`);
+      await this.execSudo(`rm ${tempFile}`);
       console.log('Password set successfully...');
       
       // Create mail directory structure in user's home
@@ -46,10 +63,10 @@ class UserSystemService {
       }
       
       console.log(`System user ${username} created successfully`);
-      return true;
+      return { status: 'success', message: 'User created successfully' };
     } catch (error) {
-      console.error('Failed to create system user:', error);
-      throw new Error(`Failed to create system user: ${error.message}`);
+      console.error('Failed in async user creation:', error);
+      throw error;
     }
   }
 

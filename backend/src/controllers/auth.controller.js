@@ -2,9 +2,9 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import User from '../models/user.model.js';
 import mailService from '../services/mail.service.js';
-import linuxUserService from '../services/linux-user.service.js';
 import cleanupService from '../services/cleanup.service.js';
 import crypto from 'crypto';
+import userSystemService from '../services/user-system.service.js'; // Import userSystemService
 
 // Helper function to generate tokens
 const generateTokens = (userId) => {
@@ -48,85 +48,32 @@ export const register = async (req, res) => {
       });
     }
 
-    // Check if user already exists with either email
-    console.log('Checking for existing user...');
-    const existingUser = await User.findOne({
-      $or: [
-        { regularEmail },
-        { csmclName }
-      ]
-    });
-
-    if (existingUser) {
-      console.log('User already exists:', existingUser.regularEmail === regularEmail ? 'Email taken' : 'CSMCL name taken');
-      return res.status(400).json({
-        status: 'error',
-        message: existingUser.regularEmail === regularEmail 
-          ? 'Email already registered' 
-          : 'CSMCL name already taken'
-      });
-    }
-
-    // Check if Linux user already exists
-    const linuxUserExists = await linuxUserService.userExists(csmclName);
-    if (linuxUserExists) {
-      console.log('Linux user already exists:', csmclName);
-      return res.status(400).json({
-        status: 'error',
-        message: 'Username already taken'
-      });
-    }
-
-    // Create new user in MongoDB
-    console.log('Creating new user...');
+    // Create new user
+    const hashedPassword = await bcrypt.hash(password, 10);
     const user = new User({
       displayName,
       csmclName,
-      regularEmail,
+      regularEmail: regularEmail.toLowerCase(),
       simNumber,
-      password,
-      cosmicalEmail: `${csmclName}@cosmical.me`
+      password: hashedPassword,
+      verificationToken: crypto.randomBytes(32).toString('hex')
     });
 
-    // Generate verification tokens
-    console.log('Generating verification token...');
-    const emailToken = crypto.randomBytes(32).toString('hex');
-    user.emailVerificationToken = emailToken;
-    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    // Save user to database
+    await user.save();
+    
+    // Send verification email
+    await mailService.sendVerificationEmail(user.regularEmail, user.verificationToken);
 
-    try {
-      // Save user first
-      console.log('Saving user to database...');
-      await user.save();
-      console.log('User saved successfully');
-
-      // Send verification email
-      console.log('Sending verification email...');
-      await mailService.sendVerificationEmail(user.regularEmail, emailToken);
-      console.log('Verification email sent successfully');
-
-      // Return success response
-      return res.status(201).json({
-        status: 'success',
-        message: 'Registration successful. Please check your email for verification instructions.',
-        data: {
-          user: {
-            _id: user._id,
-            displayName: user.displayName,
-            csmclName: user.csmclName,
-            regularEmail: user.regularEmail,
-            cosmicalEmail: user.cosmicalEmail
-          }
-        }
-      });
-    } catch (error) {
-      // If anything fails, clean up
-      console.error('Error in final steps:', error);
-      if (user._id) {
-        await User.findByIdAndDelete(user._id);
+    res.status(201).json({
+      status: 'success',
+      message: 'Registration successful. Please check your email for verification.',
+      data: {
+        displayName: user.displayName,
+        csmclName: user.csmclName,
+        regularEmail: user.regularEmail
       }
-      throw error;
-    }
+    });
   } catch (error) {
     console.error('Registration error:', error);
     if (error.name === 'ValidationError') {
@@ -157,8 +104,8 @@ export const verifyEmail = async (req, res) => {
     const { token } = req.body;
 
     const user = await User.findOne({
-      emailVerificationToken: token,
-      emailVerificationExpires: { $gt: Date.now() }
+      verificationToken: token,
+      verificationExpires: { $gt: Date.now() }
     });
 
     if (!user) {
@@ -178,22 +125,8 @@ export const verifyEmail = async (req, res) => {
     }
 
     user.isEmailVerified = true;
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpires = undefined;
-
-    // If both email and phone are verified, create Linux user
-    if (user.isSimVerified && !user.linuxUserCreated) {
-      try {
-        await linuxUserService.createUser(user.csmclName, user.password);
-        user.linuxUserCreated = true;
-      } catch (error) {
-        console.error('Failed to create Linux user:', error);
-        return res.status(500).json({
-          status: 'error',
-          message: 'Failed to create system account'
-        });
-      }
-    }
+    user.verificationToken = undefined;
+    user.verificationExpires = undefined;
 
     await user.save();
 
@@ -206,9 +139,7 @@ export const verifyEmail = async (req, res) => {
           displayName: user.displayName,
           csmclName: user.csmclName,
           regularEmail: user.regularEmail,
-          isEmailVerified: user.isEmailVerified,
-          isSimVerified: user.isSimVerified,
-          linuxUserCreated: user.linuxUserCreated
+          isEmailVerified: user.isEmailVerified
         }
       }
     });
@@ -230,7 +161,7 @@ export const login = async (req, res) => {
     const user = await User.findOne({
       $or: [
         { regularEmail: email.toLowerCase() },
-        { cosmicalEmail: email.toLowerCase() }
+        { csmclName: email.toLowerCase() }
       ]
     }).select('+password'); // Include password field
 
@@ -243,18 +174,16 @@ export const login = async (req, res) => {
     }
 
     // Check if user is verified
-    if (!user.isEmailVerified || !user.isSimVerified) {
+    if (!user.isEmailVerified) {
       console.error('User not verified:', { 
         email, 
-        isEmailVerified: user.isEmailVerified, 
-        isSimVerified: user.isSimVerified 
+        isEmailVerified: user.isEmailVerified 
       });
       return res.status(401).json({
         status: 'error',
-        message: 'Please verify your email and phone number before logging in',
+        message: 'Please verify your email before logging in',
         verificationStatus: {
-          email: user.isEmailVerified,
-          sim: user.isSimVerified
+          email: user.isEmailVerified
         }
       });
     }
@@ -294,10 +223,7 @@ export const login = async (req, res) => {
           displayName: user.displayName,
           csmclName: user.csmclName,
           regularEmail: user.regularEmail,
-          cosmicalEmail: user.cosmicalEmail,
-          isEmailVerified: user.isEmailVerified,
-          isSimVerified: user.isSimVerified,
-          linuxUserCreated: user.linuxUserCreated
+          isEmailVerified: user.isEmailVerified
         },
         accessToken
       }
@@ -334,20 +260,6 @@ export const verifyPhone = async (req, res) => {
     user.simVerificationCode = undefined;
     user.simVerificationExpires = undefined;
 
-    // If both email and phone are verified, create Linux user
-    if (user.isEmailVerified && !user.linuxUserCreated) {
-      try {
-        await linuxUserService.createUser(user.csmclName, user.password);
-        user.linuxUserCreated = true;
-      } catch (error) {
-        console.error('Failed to create Linux user:', error);
-        return res.status(500).json({
-          status: 'error',
-          message: 'Failed to create system account'
-        });
-      }
-    }
-
     await user.save();
 
     return res.status(200).json({
@@ -360,8 +272,7 @@ export const verifyPhone = async (req, res) => {
           csmclName: user.csmclName,
           regularEmail: user.regularEmail,
           isEmailVerified: user.isEmailVerified,
-          isSimVerified: user.isSimVerified,
-          linuxUserCreated: user.linuxUserCreated
+          isSimVerified: user.isSimVerified
         }
       }
     });
@@ -566,15 +477,15 @@ export const resendVerificationEmail = async (req, res) => {
     }
 
     // Generate new verification token
-    const emailToken = crypto.randomBytes(32).toString('hex');
-    user.emailVerificationToken = emailToken;
-    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    user.verificationToken = verificationToken;
+    user.verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     await user.save();
     console.log('Generated new verification token for:', email);
 
     // Send verification email
-    await mailService.sendVerificationEmail(user.regularEmail, emailToken, user.displayName);
+    await mailService.sendVerificationEmail(user.regularEmail, verificationToken, user.displayName);
     console.log('Sent verification email to:', email);
 
     return res.status(200).json({
@@ -586,6 +497,43 @@ export const resendVerificationEmail = async (req, res) => {
     return res.status(500).json({
       status: 'error',
       message: 'Failed to resend verification email'
+    });
+  }
+};
+
+// Check user creation status
+export const checkUserStatus = async (req, res) => {
+  try {
+    const { username } = req.params;
+    
+    // Check if user exists in MongoDB
+    const user = await User.findOne({ csmclName: username });
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Check system user status
+    const systemUserExists = await userSystemService.checkSystemUser(username);
+    
+    if (systemUserExists) {
+      res.json({
+        status: 'completed',
+        message: 'User creation completed'
+      });
+    } else {
+      res.json({
+        status: 'pending',
+        message: 'User creation in progress'
+      });
+    }
+  } catch (error) {
+    console.error('Status check error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to check user status'
     });
   }
 };

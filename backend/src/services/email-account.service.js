@@ -4,22 +4,31 @@ import userSystemService from './user-system.service.js';
 class EmailAccountService {
   constructor() {
     this.initialized = false;
+    this.isDevelopment = process.env.NODE_ENV !== 'production';
   }
 
   async ensureInitialized() {
     if (this.initialized) return;
     
     try {
-      // Create transporter with config
-      this.transporter = nodemailer.createTransport({
-        host: process.env.MAIL_HOST,
-        port: parseInt(process.env.MAIL_PORT),
-        secure: process.env.MAIL_SECURE === 'true',
-        auth: {
-          user: process.env.MAIL_USER,
-          pass: process.env.MAIL_PASSWORD
-        }
-      });
+      // In development, use direct Maildir delivery
+      if (this.isDevelopment) {
+        this.transporter = nodemailer.createTransport({
+          streamTransport: true,
+          newline: 'unix'
+        });
+      } else {
+        // In production, use SMTP
+        this.transporter = nodemailer.createTransport({
+          host: process.env.MAIL_HOST,
+          port: parseInt(process.env.MAIL_PORT),
+          secure: process.env.MAIL_SECURE === 'true',
+          auth: {
+            user: process.env.MAIL_USER,
+            pass: process.env.MAIL_PASSWORD
+          }
+        });
+      }
       
       // Verify connection
       await this.transporter.verify();
@@ -28,9 +37,9 @@ class EmailAccountService {
       
       // Log mail configuration
       console.log('Initializing email configuration with:', {
-        host: process.env.MAIL_HOST,
-        port: process.env.MAIL_PORT,
-        from: process.env.MAIL_FROM
+        mode: this.isDevelopment ? 'development (stream)' : 'production (smtp)',
+        host: this.isDevelopment ? 'localhost' : process.env.MAIL_HOST,
+        from: process.env.MAIL_FROM || 'noreply@local-dev.test'
       });
     } catch (error) {
       console.error('Email configuration error:', error);
@@ -43,7 +52,11 @@ class EmailAccountService {
   }
 
   async createEmailAccount(username, password) {
-    return await userSystemService.createSystemUser(username, password);
+    const result = await userSystemService.createSystemUser(username, password);
+    if (result.status === 'pending') {
+      console.log('Email account creation started:', result.message);
+    }
+    return result;
   }
 
   async deleteEmailAccount(username) {
@@ -55,7 +68,7 @@ class EmailAccountService {
       await this.ensureInitialized();
       
       const message = {
-        from: `CSMCL <${process.env.MAIL_FROM || 'noreply@local.test'}>`,
+        from: `CSMCL <${process.env.MAIL_FROM || 'noreply@local-dev.test'}>`,
         to: user.regularEmail,
         subject: 'Verify your CSMCL account',
         text: `Hello ${user.displayName},\n\nYour email verification token is:\n\n${verificationToken}\n\nPlease enter this token in the verification form to verify your email address.\n\nIf you did not request this verification, please ignore this email.\n\nBest regards,\nCSMCL Team`,
@@ -72,17 +85,50 @@ class EmailAccountService {
         `
       };
 
+      console.log('Attempting to send verification email:', {
+        to: message.to,
+        from: message.from,
+        subject: message.subject
+      });
+
       const info = await this.transporter.sendMail(message);
-      console.log('Verification email sent:', info.messageId);
       
-      // If we're in development mode using Ethereal, log the preview URL
-      // const previewUrl = nodemailer.getTestMessageUrl(info);
-      // console.log('Preview URL:', previewUrl);
+      // In development, write to Maildir directly
+      if (this.isDevelopment && info.message) {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const crypto = await import('crypto');
+        const { execSync } = await import('child_process');
+        
+        const username = user.regularEmail.split('@')[0];
+        const maildir = `/home/${username}/Maildir/new`;
+        const timestamp = Math.floor(Date.now() / 1000);
+        const random = crypto.randomBytes(8).toString('hex');
+        const filename = `${timestamp}.${random}.localhost.localdomain`;
+        const filepath = path.join(maildir, filename);
+        
+        await fs.writeFile(filepath, info.message);
+        execSync(`sudo -A chown ${username}:mail ${filepath}`, { env: { SUDO_ASKPASS: './backend/scripts/sudo-askpass.sh' } });
+        execSync(`sudo -A chmod 660 ${filepath}`, { env: { SUDO_ASKPASS: './backend/scripts/sudo-askpass.sh' } });
+        console.log('Email written to Maildir:', filepath);
+      } else {
+        console.log('Verification email sent:', {
+          messageId: info.messageId,
+          response: info.response,
+          envelope: info.envelope
+        });
+      }
+      
       console.log('Verification token:', verificationToken);  // Log the token for easy testing
 
       return true;
     } catch (error) {
-      console.error('Error sending verification email:', error);
+      console.error('Error sending verification email:', {
+        error: error.message,
+        stack: error.stack,
+        code: error.code,
+        command: error.command
+      });
       throw error;
     }
   }

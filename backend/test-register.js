@@ -2,12 +2,12 @@ import axios from 'axios';
 
 const testRegistration = async () => {
   try {
-    const response = await axios.post('http://localhost:5000/api/auth/register', {
-      displayName: "Test User",
-      csmclName: "testuser123",
-      regularEmail: "your.email@example.com",  // Replace with your email
-      simNumber: "1234567890",
-      password: "TestPass123!"
+    const response = await axios.post('http://localhost:5001/api/auth/register', {
+      displayName: "Gandalf The Grey",
+      csmclName: "gandalfgrey",
+      regularEmail: "gandalf@local-dev.test",
+      simNumber: "+12345678921",
+      password: "YouShallNotPass789!"
     });
 
     console.log('Registration Response:', response.data);
