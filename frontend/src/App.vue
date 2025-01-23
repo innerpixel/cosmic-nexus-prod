@@ -7,13 +7,21 @@
   @author [Your Name]
   @version 1.0.0
 -->
+<script setup>
+import { RouterView } from 'vue-router';
+import StatusFooter from './components/StatusFooter.vue';
+</script>
+
 <template>
-  <router-view v-slot="{ Component }">
-    <component :is="Component" />
+  <div class="min-h-screen bg-white dark:bg-gray-900">
+    <router-view v-slot="{ Component }">
+      <component :is="Component" />
+    </router-view>
     <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-4">
       Welcome to CSMCL Space - Your Digital Hub (Updated)
     </h1>
-  </router-view>
+    <StatusFooter />
+  </div>
 </template>
 
 <style>

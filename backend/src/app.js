@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
+import statusRoutes from './routes/status.routes.js';
 
 // Load environment variables
 dotenv.config({ path: process.env.NODE_ENV === 'development' ? '.env.development' : '.env' });
@@ -37,6 +38,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Routes
+app.use('/api', statusRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 
