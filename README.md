@@ -41,7 +41,7 @@ A modern web application for space exploration and community engagement. Built w
 
 ### Infrastructure
 - Nginx for web server
-- PM2 for process management
+- Systemd for service management
 - GitHub Actions for CI/CD
 - SSL/TLS encryption
 
@@ -104,7 +104,7 @@ A modern web application for space exploration and community engagement. Built w
 - URL: https://csmcl.space
 - Automated deployment via GitHub Actions
 - SSL/TLS encryption
-- PM2 process management
+- Systemd service management
 
 ## Available Scripts
 
