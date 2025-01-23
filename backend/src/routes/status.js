@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import nodemailer from 'nodemailer';
 import { version, commit } from '../version.js';
+import User from '../models/user.model.js';
 
 const router = express.Router();
 
@@ -36,6 +37,27 @@ router.get('/health', async (req, res) => {
 // Version endpoint
 router.get('/version', (req, res) => {
     res.json({ version, commit });
+});
+
+// Users stats endpoint
+router.get('/users/stats', async (req, res) => {
+    try {
+        const totalUsers = await User.countDocuments();
+        const verifiedUsers = await User.countDocuments({ isEmailVerified: true });
+        const activeUsers = await User.countDocuments({ isExpired: false });
+        const systemUsers = await User.countDocuments({ linuxUserCreated: true });
+        
+        res.json({
+            total: totalUsers,
+            verified: verifiedUsers,
+            active: activeUsers,
+            systemUsers: systemUsers,
+            lastUpdated: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Error getting user stats:', error);
+        res.status(500).json({ error: 'Failed to get user statistics' });
+    }
 });
 
 export default router;

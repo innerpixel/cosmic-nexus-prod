@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import authRoutes from './routes/auth.routes.js';
 import adminRoutes from './routes/admin.routes.js';
-import testRoutes from './routes/test.routes.js';
+import statusRoutes from './routes/status.js';
 
 // Load environment variables based on NODE_ENV
 const envFile = process.env.NODE_ENV === 'development' ? '.env.development' : '.env';
@@ -48,14 +48,9 @@ app.use((req, res, next) => {
 });
 
 // Routes
+app.use('/api', statusRoutes);  // Mount status routes at /api
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/test', testRoutes);
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
 
 // 404 handler
 app.use((req, res) => {
@@ -77,14 +72,14 @@ app.use((err, req, res, next) => {
 
 // Connect to MongoDB
 console.log('Attempting to connect to MongoDB...');
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/cosmic-nexus-dev', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/local_dev', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 }).then(() => {
   console.log('Connected to MongoDB');
   
   // Start server after DB connection
-  const port = process.env.PORT || 5000;
+  const port = process.env.PORT || 3000;
   app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
   });
