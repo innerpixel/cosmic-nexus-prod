@@ -7,7 +7,6 @@
   "scripts": {
     "start": "node src/index.js",
     "restart": "pkill -f 'node src/index.js' || true; npm start",
-    "dev": "nodemon src/index.js",
     "test": "vitest",
     "test:emails": "node src/scripts/test-emails.js",
     "test:users": "node src/scripts/test-user-flows.js"
@@ -26,8 +25,5 @@
     "node-fetch": "^3.3.2",
     "nodemailer": "^6.9.16",
     "rimraf": "^5.0.5"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.9"
   }
 }
