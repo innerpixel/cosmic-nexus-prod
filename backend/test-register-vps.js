@@ -7,19 +7,28 @@ const testVPSRegistration = async () => {
     const axiosInstance = axios.create({
       httpsAgent: new https.Agent({  
         rejectUnauthorized: false
-      })
+      }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
     });
 
     console.log('\nTest 1: Valid Registration');
     try {
       const response = await axiosInstance.post('https://csmcl.space/api/auth/register', {
-        displayName: "Dumbledore The Wise",
-        csmclName: "dumbledore",
-        regularEmail: "dumbledore@csmcl.space",
-        simNumber: "+12345678922",
-        password: "LemonDrop789!"
+        displayName: "Nova Stardust",
+        csmclName: "nova-stardust",
+        regularEmail: "nova@cosmical.me", // Using cosmical.me domain for testing
+        simNumber: "+12025550179",
+        password: "NovaStardust2025!"
       });
       console.log('Registration Response:', response.data);
+      
+      // If registration successful, we should receive a pending status
+      if (response.data.status === 'pending') {
+        console.log('Registration pending. Check verification email at nova@cosmical.me');
+      }
     } catch (error) {
       console.error('Registration Error:', error.response?.data || error.message);
     }
@@ -28,6 +37,7 @@ const testVPSRegistration = async () => {
     try {
       await axiosInstance.post('https://csmcl.space/api/auth/register', {
         displayName: "Incomplete User"
+        // Missing other required fields
       });
     } catch (error) {
       console.log('Expected error:', error.response?.data || error.message);
@@ -37,9 +47,9 @@ const testVPSRegistration = async () => {
     try {
       await axiosInstance.post('https://csmcl.space/api/auth/register', {
         displayName: "Invalid Email User",
-        csmclName: "invalid",
+        csmclName: "invalid-email",
         regularEmail: "not-an-email",
-        simNumber: "+12345678923",
+        simNumber: "+12025550180",
         password: "Password123!"
       });
     } catch (error) {
@@ -51,7 +61,7 @@ const testVPSRegistration = async () => {
       await axiosInstance.post('https://csmcl.space/api/auth/register', {
         displayName: "Invalid Phone User",
         csmclName: "invalid-phone",
-        regularEmail: "invalid.phone@csmcl.space",
+        regularEmail: "invalid.phone@cosmical.me",
         simNumber: "not-a-phone",
         password: "Password123!"
       });
