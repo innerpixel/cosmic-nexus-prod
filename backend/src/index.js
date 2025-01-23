@@ -84,9 +84,9 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/cosmic-ne
   console.log('Connected to MongoDB');
   
   // Start server after DB connection
-  const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  const port = process.env.PORT || 5000;
+  app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
   });
 }).catch(err => {
   console.error('MongoDB connection error:', err);
