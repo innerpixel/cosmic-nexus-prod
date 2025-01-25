@@ -45,6 +45,24 @@ A modern web application for space exploration and community engagement. Built w
 - GitHub Actions for CI/CD
 - SSL/TLS encryption
 
+## Repository Setup
+
+This repository is configured with two remotes:
+- `production`: GitHub repository (git@github.com:innerpixel/cosmic-nexus-prod.git)
+- `local`: Local development server (/srv/git/cosmic-nexus.git)
+
+To push changes:
+```bash
+# Push to GitHub (production)
+git push production main
+
+# Push to local development server
+git push local main
+
+# Push to both remotes
+git push --all
+```
+
 ## Development Setup
 
 1. Clone the repository:
