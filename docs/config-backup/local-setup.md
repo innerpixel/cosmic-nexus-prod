@@ -127,9 +127,12 @@ Project Root: /home/nsbasicus/CascadeProjects/StarterTemplateDesignIdeas
 
 --- Mail Configuration ---
 ```properties
-Mail Server: mail.cosmical.me
+Mail Server: localhost
 Mail Port: 25
-From Address: noreply@cosmical.me
+From Address: noreply@local-dev.test
+SSL: Enabled (using local certificates)
+Certificate Path: /etc/nginx/ssl/local.csmcl.space/local.crt
+Certificate Key: /etc/nginx/ssl/local.csmcl.space/local.key
 ```
 
 --- Git Configuration ---

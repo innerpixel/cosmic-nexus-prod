@@ -5,8 +5,8 @@ Cosmic Nexus is a modern, full-stack web application template that provides a so
 
 ## Development Environments
 
-### Local Development (AlmaLinux)
-- **Operating System**: AlmaLinux
+### Local Development (Ubuntu)
+- **Operating System**: Ubuntu 24.10
 - **Node.js**: Latest LTS version
 - **Package Manager**: npm
 - **Build Tool**: Vite

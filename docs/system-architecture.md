@@ -6,7 +6,7 @@ CSMCL SPACE is a decentralized platform that combines traditional web services w
 
 ### Domain Structure
 
-#### 1. Mail Server (`cosmical.me`)
+#### 1. VPS Mail Server (`cosmical.me`)
 - **Purpose**: Dedicated mail services only
 - **Email Authentication**:
   - DKIM: Digital signatures for email verification
@@ -18,7 +18,7 @@ CSMCL SPACE is a decentralized platform that combines traditional web services w
   - Strict email security policies
   - Complete email authentication suite
 
-#### 2. Web Server (`csmcl.space`)
+#### 2. VPS Web Server (`csmcl.space`)
 - **Purpose**: Web application and user space hosting
 - **Security**:
   - SSL/TLS encryption
@@ -180,7 +180,7 @@ CSMCL SPACE is a decentralized platform that combines traditional web services w
 ### Development Environment
 
 1. **Local Development**:
-   - AlmaLinux development environment
+   - Ubuntu 24.10 development environment
    - Development scripts for easy setup
    - Comprehensive test suite
 

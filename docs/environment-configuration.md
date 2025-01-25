@@ -39,9 +39,10 @@ The application uses cosmical.me as the mail server for all environments.
 - **Password**: Obtain from system administrator
 
 #### Testing Environment
-- Uses Ethereal Email for testing (credentials automatically generated)
-- No real emails are sent in test environment
-- Test emails can be viewed in the Ethereal Email web interface
+- Uses local Postfix mail server with SSL
+- Mail server configured for local development
+- Test emails are handled locally
+- SSL certificates for secure mail testing
 
 #### Production Environment
 - **Host**: mail.cosmical.me

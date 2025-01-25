@@ -69,7 +69,7 @@ graph TD
 
 4. **Testing Infrastructure**
    - Automated flow testing
-   - Ethereal email integration
+   - Local mail server integration
    - MongoDB test integration
    - Error handling validation
 
@@ -117,8 +117,8 @@ graph TD
 ```env
 NODE_ENV=development
 MONGODB_URI=mongodb://localhost:27017/cosmic-nexus
-MAIL_API_ENDPOINT=https://mail.cosmical.me/api
-MAIL_DOMAIN=cosmical.me
+MAIL_API_ENDPOINT=localhost:25
+MAIL_DOMAIN=local-dev.test
 FRONTEND_URL=http://localhost:3000
 ```
 
@@ -165,7 +165,7 @@ FRONTEND_URL=https://csmcl.space
 
 ### Running Tests
 ```bash
-# Development tests with Ethereal email
+# Development tests with local mail server
 NODE_ENV=development npm run test:users
 
 # Production tests

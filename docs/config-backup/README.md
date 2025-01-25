@@ -3,7 +3,7 @@
 ## Local Development Setup
 
 ### System Requirements
-- OS: AlmaLinux
+- OS: Ubuntu 24.10
 - Node.js
 - MongoDB
 - Nginx
@@ -48,10 +48,10 @@ WantedBy=multi-user.target
 
 #### Mail Configuration
 ```properties
-Mail Server: mail.cosmical.me
+Mail Server: localhost
 Mail Port: 25
-From Address: noreply@cosmical.me
-Development Mode: Uses ethereal.email for testing
+From Address: noreply@local-dev.test
+Development Mode: Local Postfix with SSL
 ```
 
 ### Domain Configuration
