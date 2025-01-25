@@ -15,10 +15,13 @@ These files are not committed to the repository for security reasons. Instead, u
 ## Domain Configuration
 
 ### Development Environment
-- **Local Domain**: cosmic-nexus.local
+- **Domain**: local-dev.test
 - **Protocol**: HTTPS (self-signed certificate)
-- **Web Root**: /var/www/cosmic-nexus
-- **Nginx Config**: /etc/nginx/conf.d/cosmic-nexus.conf
+- **Frontend Port**: 3000
+- **Backend Port**: 5000
+- **Mail Port**: 25
+- **Database**: MongoDB (local)
+- **Mail Server**: Postfix + Dovecot (Maildir)
 
 ### Production Environment
 - **Domain**: csmcl.space
